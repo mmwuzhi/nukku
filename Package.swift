@@ -1,0 +1,27 @@
+// swift-tools-version: 6.0
+
+import PackageDescription
+
+let package = Package(
+    name: "Nukku",
+    platforms: [
+        .macOS(.v26)
+    ],
+    products: [
+        .executable(name: "Nukku", targets: ["Nukku"])
+    ],
+    targets: [
+        .executableTarget(
+            name: "Nukku",
+            path: "Sources/Nukku",
+            swiftSettings: [
+                .swiftLanguageMode(.v6)
+            ]
+        ),
+        .testTarget(
+            name: "NukkuTests",
+            dependencies: ["Nukku"],
+            path: "Tests/NukkuTests"
+        )
+    ]
+)
