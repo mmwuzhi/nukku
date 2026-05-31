@@ -62,14 +62,17 @@ final class MediaRemoteClient {
     static let nowPlayingInfoChanged = Notification.Name("kMRMediaRemoteNowPlayingInfoDidChangeNotification")
     static let isPlayingChanged = Notification.Name("kMRMediaRemoteNowPlayingApplicationIsPlayingDidChangeNotification")
 
+    // Wraps [String: Any] as Sendable. Safe: MediaRemote creates a fresh dict per callback.
+    private struct NowPlayingInfoBox: @unchecked Sendable { let dict: [String: Any] }
+
     func fetchNowPlayingInfo() async -> [String: Any] {
-        await withCheckedContinuation { cont in
+        await withCheckedContinuation { (cont: CheckedContinuation<NowPlayingInfoBox, Never>) in
             guard let fn = getNowPlayingInfo else {
-                cont.resume(returning: [:])
+                cont.resume(returning: NowPlayingInfoBox(dict: [:]))
                 return
             }
-            fn(.main) { info in cont.resume(returning: info) }
-        }
+            fn(.main) { info in cont.resume(returning: NowPlayingInfoBox(dict: info)) }
+        }.dict
     }
 
     func fetchIsPlaying() async -> Bool {
