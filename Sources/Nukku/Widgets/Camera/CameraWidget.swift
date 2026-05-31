@@ -6,14 +6,12 @@ enum CameraWidget {
         makeWidgetBox(
             id: "camera",
             displayName: "镜子",
-            iconName: "camera.fill"
+            iconName: "camera.fill",
+            activate: { Task { await viewModel.activate() } },
+            deactivate: { viewModel.deactivate() }
         ) {
             CameraWidgetView()
                 .environment(viewModel)
-        } activate: {
-            Task { await viewModel.activate() }
-        } deactivate: {
-            viewModel.deactivate()
         }
     }
 }
