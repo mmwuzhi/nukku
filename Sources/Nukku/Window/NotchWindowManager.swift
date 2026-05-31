@@ -63,15 +63,15 @@ final class NotchWindowManager {
         panel.contentView = hostingView
 
         // Provide hitTest rect (view-local coords, y-down)
+        let capturedHUDVM = hudViewModel
         hostingView.interactiveRect = { [weak notchVM] in
             guard let vm = notchVM else { return .zero }
-            let size = vm.targetInteractiveSize
+            // When a HUD is active the visible notch is hudWidth wide — match the hit zone.
+            let isHUDActive = !vm.isExpanded && capturedHUDVM.currentHUD != nil
+            let width: CGFloat = isHUDActive ? Constants.Notch.hudWidth : vm.targetInteractiveSize.width
+            let height: CGFloat = vm.targetInteractiveSize.height
             let midX = Constants.Notch.canvasWidth / 2
-            // y = 0 at top (isFlipped = true)
-            return CGRect(x: midX - size.width / 2,
-                          y: 0,
-                          width:  size.width,
-                          height: size.height)
+            return CGRect(x: midX - width / 2, y: 0, width: width, height: height)
         }
 
         // Make layer opaque=false to avoid first-frame flash

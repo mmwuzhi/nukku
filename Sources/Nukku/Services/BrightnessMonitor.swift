@@ -10,6 +10,7 @@ final class BrightnessMonitor {
     private var timer: DispatchSourceTimer?
 
     func start() {
+        timer?.cancel()  // guard against double-start leaking an active DispatchSourceTimer
         let capturedOnChange = onChange  // capture Sendable closure once; safe to read from bg
         let t = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
         t.schedule(deadline: .now() + 0.25, repeating: 0.25)

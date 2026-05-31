@@ -69,11 +69,13 @@ final class NotchViewModel {
 
     private func activateCurrentWidget() {
         guard let id = activeWidgetID else { return }
-        WidgetRegistry.shared.widgets.first(where: { $0.id == id })?.activate()
+        // Only activate enabled widgets; a disabled widget must not start background work
+        WidgetRegistry.shared.enabledWidgets.first(where: { $0.id == id })?.activate()
     }
 
     private func deactivateCurrentWidget() {
         guard let id = activeWidgetID else { return }
+        // Search all widgets so we can deactivate one that was just disabled mid-session
         WidgetRegistry.shared.widgets.first(where: { $0.id == id })?.deactivate()
     }
 }

@@ -2,6 +2,7 @@ import CoreAudio
 import Foundation
 
 /// Monitors the system default output device for volume and mute changes.
+/// Automatically re-binds when the default output device changes (e.g. AirPods connect).
 /// Callbacks are delivered on the main thread.
 ///
 /// Note: CoreAudio listener blocks are C-level callbacks. Strict Swift 6
@@ -12,9 +13,10 @@ final class VolumeMonitor {
     var onChange: @Sendable (Float, Bool) -> Void = { _, _ in }
 
     private var deviceID: AudioDeviceID = kAudioObjectUnknown
-    // Stored so we can pass the identical block to Remove.
-    private var volumeListenerBlock: AudioObjectPropertyListenerBlock?
-    private var muteListenerBlock:   AudioObjectPropertyListenerBlock?
+    // Stored so we can pass the identical blocks to Remove.
+    private var volumeListenerBlock:       AudioObjectPropertyListenerBlock?
+    private var muteListenerBlock:         AudioObjectPropertyListenerBlock?
+    private var deviceChangeListenerBlock: AudioObjectPropertyListenerBlock?
 
     func start() {
         deviceID = resolveDefaultOutputDevice()
@@ -103,6 +105,24 @@ final class VolumeMonitor {
         }
         muteListenerBlock = muteBlock
         AudioObjectAddPropertyListenerBlock(capturedDeviceID, &muteAddr, nil, muteBlock)
+
+        // Default device change listener — re-bind when e.g. AirPods connect
+        var deviceAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope:    kAudioObjectPropertyScopeGlobal,
+            mElement:  kAudioObjectPropertyElementMain
+        )
+        let deviceBlock: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.deviceID != kAudioObjectUnknown else { return }
+                self.stop()
+                self.start()
+            }
+        }
+        deviceChangeListenerBlock = deviceBlock
+        AudioObjectAddPropertyListenerBlock(
+            AudioObjectID(kAudioObjectSystemObject), &deviceAddr, nil, deviceBlock
+        )
     }
 
     private func removeListeners() {
@@ -124,6 +144,18 @@ final class VolumeMonitor {
         if let b = muteListenerBlock {
             AudioObjectRemovePropertyListenerBlock(deviceID, &muteAddr, nil, b)
             muteListenerBlock = nil
+        }
+
+        var deviceAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope:    kAudioObjectPropertyScopeGlobal,
+            mElement:  kAudioObjectPropertyElementMain
+        )
+        if let b = deviceChangeListenerBlock {
+            AudioObjectRemovePropertyListenerBlock(
+                AudioObjectID(kAudioObjectSystemObject), &deviceAddr, nil, b
+            )
+            deviceChangeListenerBlock = nil
         }
     }
 }

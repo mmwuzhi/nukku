@@ -5,7 +5,10 @@ struct NotchContainerView: View {
     @Environment(MediaViewModel.self)  private var mediaVM
     @Environment(HUDViewModel.self)    private var hudVM
 
-    private let prefs = PreferencesManager.shared
+    // @AppStorage is reactive directly in the view — avoids the @ObservationIgnored issue
+    // in PreferencesManager which would freeze the branch at first render.
+    @AppStorage("expandTrigger") private var expandTriggerRaw: String = ExpandTrigger.hover.rawValue
+    private var expandTrigger: ExpandTrigger { ExpandTrigger(rawValue: expandTriggerRaw) ?? .hover }
 
     // ── Geometry derived from state ──
     private var isHUDActive: Bool { !vm.isExpanded && hudVM.currentHUD != nil }
@@ -34,7 +37,7 @@ struct NotchContainerView: View {
                     radius: 16, y: 8
                 )
                 .animation(shapeSpring, value: vm.state)
-                .animation(.spring(response: 0.28, dampingFraction: 0.80), value: isHUDActive)
+                .animation(NotchAnimator.hudTransition, value: isHUDActive)
 
             // ── 2. Content layer ──
             ZStack {
@@ -48,12 +51,12 @@ struct NotchContainerView: View {
                 CollapsedView()
                     .environment(mediaVM)
                     .opacity(vm.isExpanded || isHUDActive ? 0 : 1)
+                    // Two separate animation drivers: one for expand/collapse, one for HUD crossfade
                     .animation(
-                        vm.isExpanded
-                            ? NotchAnimator.contentHide
-                            : NotchAnimator.contentReveal.delay(0.15),
+                        vm.isExpanded ? NotchAnimator.contentHide : NotchAnimator.contentReveal.delay(0.15),
                         value: vm.state
                     )
+                    .animation(NotchAnimator.contentHide, value: isHUDActive)
 
                 // Expanded panel content
                 ExpandedView()
@@ -68,7 +71,7 @@ struct NotchContainerView: View {
             .frame(width: targetWidth, height: targetHeight)
             .clipShape(currentShape)
             .animation(shapeSpring, value: vm.state)
-            .animation(.spring(response: 0.28, dampingFraction: 0.80), value: isHUDActive)
+            .animation(NotchAnimator.hudTransition, value: isHUDActive)
         }
         .frame(
             width:  Constants.Notch.canvasWidth,
@@ -76,9 +79,9 @@ struct NotchContainerView: View {
             alignment: .top
         )
         .contentShape(currentShape)
-        // ── Interaction: hover vs click (B1 prefs gate) ──
-        .modifier(NotchInteractionModifier(vm: vm, prefs: prefs))
-        .animation(.spring(response: 0.28, dampingFraction: 0.80), value: hudVM.currentHUD != nil)
+        // Pass expandTrigger as a value so the modifier re-evaluates when the user changes it
+        .modifier(NotchInteractionModifier(vm: vm, trigger: expandTrigger))
+        .animation(NotchAnimator.hudTransition, value: hudVM.currentHUD != nil)
     }
 
     private var currentShape: NotchShape {
@@ -95,10 +98,10 @@ struct NotchContainerView: View {
 
 private struct NotchInteractionModifier: ViewModifier {
     let vm: NotchViewModel
-    let prefs: PreferencesManager
+    let trigger: ExpandTrigger  // value type — parent re-creates modifier when setting changes
 
     func body(content: Content) -> some View {
-        if prefs.expandTrigger == .hover {
+        if trigger == .hover {
             content
                 .onHover { hovering in
                     if hovering { vm.expand() } else { vm.collapse() }
