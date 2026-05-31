@@ -4,7 +4,7 @@ import SwiftUI
 @MainActor
 final class NotchWindowManager {
     private var panel: NotchPanel?
-    private let notchViewModel: NotchViewModel
+    private weak var notchViewModel: NotchViewModel?
     private let mediaViewModel: MediaViewModel
 
     init(notchViewModel: NotchViewModel, mediaViewModel: MediaViewModel) {
@@ -12,78 +12,84 @@ final class NotchWindowManager {
         self.mediaViewModel = mediaViewModel
     }
 
+    // MARK: - Setup
+
     func setupWindow() {
-        guard let screen = NSScreen.main else { return }
-        let frame = windowFrame(for: screen, width: Constants.Notch.defaultWidth, height: Constants.Notch.defaultHeight)
+        guard let screen = primaryScreen() else { return }
+
+        // Read actual notch height from screen and store in ViewModel
+        let actualCollapsedH = screen.hasNotch
+            ? screen.safeAreaInsets.top
+            : NSStatusBar.system.thickness
+        notchViewModel?.collapsedHeight = actualCollapsedH
+
+        let frame = canvasFrame(for: screen)
 
         let panel = NotchPanel(
             contentRect: frame,
-            styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
+            styleMask:   [.borderless, .nonactivatingPanel],
+            backing:     .buffered,
+            defer:       false
         )
-        // Sit just above the status bar so it overlaps the notch area
-        panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
-        panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
-        panel.backgroundColor = .clear
-        panel.isOpaque = false
-        panel.hasShadow = false
+
+        // Float above the menu bar, follow all Spaces including full-screen apps
+        panel.level            = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
+        panel.collectionBehavior = [.canJoinAllSpaces, .stationary,
+                                    .fullScreenAuxiliary, .ignoresCycle]
+        panel.backgroundColor  = .clear
+        panel.isOpaque         = false
+        panel.hasShadow        = false
+        panel.isFloatingPanel  = true
+        panel.becomesKeyOnlyIfNeeded = true
+        panel.acceptsMouseMovedEvents = true
         panel.ignoresMouseEvents = false
 
-        let contentView = NotchContainerView()
-            .environment(notchViewModel)
+        // Build SwiftUI tree
+        guard let notchVM = notchViewModel else { return }
+        let content = NotchContainerView()
+            .environment(notchVM)
             .environment(mediaViewModel)
 
-        let hostingView = TrackingHostingView(rootView: contentView)
-        hostingView.frame = panel.contentView!.bounds
+        let hostingView = NotchHostingView(rootView: content)
+        hostingView.frame = NSRect(
+            origin: .zero,
+            size: CGSize(width: Constants.Notch.canvasWidth,
+                         height: Constants.Notch.canvasHeight)
+        )
         hostingView.autoresizingMask = [.width, .height]
         panel.contentView = hostingView
 
-        hostingView.onMouseEntered = { [weak self] in
-            self?.notchViewModel.expand()
+        // Provide hitTest rect (view-local coords, y-down)
+        hostingView.interactiveRect = { [weak notchVM] in
+            guard let vm = notchVM else { return .zero }
+            let size = vm.targetInteractiveSize
+            let midX = Constants.Notch.canvasWidth / 2
+            // y = 0 at top (isFlipped = true)
+            return CGRect(x: midX - size.width / 2,
+                          y: 0,
+                          width:  size.width,
+                          height: size.height)
         }
-        hostingView.onMouseExited = { [weak self] in
-            self?.notchViewModel.collapse()
-        }
+
+        // Make layer opaque=false to avoid first-frame flash
+        hostingView.wantsLayer = true
+        hostingView.layer?.isOpaque = false
 
         self.panel = panel
-
-        // Observe ViewModel size changes to resize the panel
-        observeSizeChanges()
-
         panel.orderFrontRegardless()
     }
 
-    private func observeSizeChanges() {
-        // Poll via a periodic check using a retained reference
-        // We use a simple observation via withObservationTracking
-        scheduleObservation()
-    }
-
-    private func scheduleObservation() {
-        withObservationTracking {
-            _ = notchViewModel.notchWidth
-            _ = notchViewModel.notchHeight
-        } onChange: { [weak self] in
-            Task { @MainActor [weak self] in
-                self?.syncPanelFrame()
-                self?.scheduleObservation()
-            }
-        }
-    }
-
-    func syncPanelFrame() {
-        guard let screen = NSScreen.main, let panel else { return }
-        let frame = windowFrame(
-            for: screen,
-            width: notchViewModel.notchWidth,
-            height: notchViewModel.notchHeight
-        )
-        panel.setFrame(frame, display: true)
-    }
+    // MARK: - Reposition (screen change only, no animation)
 
     func repositionWindow() {
-        syncPanelFrame()
+        guard let screen = primaryScreen(), let panel else { return }
+
+        let actualCollapsedH = screen.hasNotch
+            ? screen.safeAreaInsets.top
+            : NSStatusBar.system.thickness
+        notchViewModel?.collapsedHeight = actualCollapsedH
+
+        panel.setFrame(canvasFrame(for: screen), display: false)
     }
 
     func teardown() {
@@ -91,25 +97,21 @@ final class NotchWindowManager {
         panel = nil
     }
 
-    // MARK: - Frame Calculation
+    // MARK: - Helpers
 
-    private func windowFrame(for screen: NSScreen, width: CGFloat, height: CGFloat) -> NSRect {
-        let screenFrame = screen.frame
-        // safeAreaInsets.top > 0 means notch machine; fall back to menu bar thickness
-        let anchorHeight = screen.hasNotch
-            ? screen.safeAreaInsets.top
-            : NSStatusBar.system.thickness
-
-        // Center the panel horizontally; expand downward from the top edge
-        let x = screenFrame.midX - width / 2
-        let y = screenFrame.maxY - anchorHeight - (height - anchorHeight).clamped(to: 0...)
-
-        return NSRect(x: x, y: y, width: width, height: height)
+    /// Prefer the built-in notch screen; fall back to main.
+    private func primaryScreen() -> NSScreen? {
+        NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? NSScreen.main
     }
-}
 
-private extension Comparable {
-    func clamped(to range: PartialRangeFrom<Self>) -> Self {
-        max(self, range.lowerBound)
+    /// Fixed canvas frame: always the same size, pinned to the top of the chosen screen.
+    private func canvasFrame(for screen: NSScreen) -> NSRect {
+        let sf = screen.frame
+        return NSRect(
+            x: sf.midX - Constants.Notch.canvasWidth / 2,
+            y: sf.maxY - Constants.Notch.canvasHeight,
+            width:  Constants.Notch.canvasWidth,
+            height: Constants.Notch.canvasHeight
+        )
     }
 }

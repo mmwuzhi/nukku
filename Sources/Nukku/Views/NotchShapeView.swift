@@ -1,69 +1,88 @@
 import SwiftUI
 
+/// Notch silhouette shape.
+/// - `topRadius`:    outer corners where the notch meets the screen bezel (top)
+/// - `bottomRadius`: inner bottom corners (large when expanded for liquid feel)
 struct NotchShape: Shape, Animatable {
     var width: CGFloat
     var height: CGFloat
-    var cornerRadius: CGFloat
+    var topRadius: CGFloat
+    var bottomRadius: CGFloat
 
-    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, CGFloat> {
-        get { AnimatablePair(AnimatablePair(width, height), cornerRadius) }
+    // Four values interpolated simultaneously by SwiftUI spring engine
+    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>,
+                                       AnimatablePair<CGFloat, CGFloat>> {
+        get {
+            AnimatablePair(
+                AnimatablePair(width, height),
+                AnimatablePair(topRadius, bottomRadius)
+            )
+        }
         set {
-            width = newValue.first.first
-            height = newValue.first.second
-            cornerRadius = newValue.second
+            width        = newValue.first.first
+            height       = newValue.first.second
+            topRadius    = newValue.second.first
+            bottomRadius = newValue.second.second
         }
     }
 
     func path(in rect: CGRect) -> Path {
-        let midX = rect.midX
+        let midX   = rect.midX
         let startX = midX - width / 2
-        let endX = midX + width / 2
+        let endX   = midX + width / 2
         let bottom = height
-        let outerR = Constants.Notch.outerCornerRadius
-        let innerR = max(cornerRadius, 1)
+        let tR     = max(topRadius, 1)        // outer/top corners
+        let bR     = max(bottomRadius, 1)     // inner/bottom corners
 
-        var path = Path()
-        // Start at top-left edge (just outside the notch)
-        path.move(to: CGPoint(x: startX - outerR, y: 0))
-        // Outer left corner (curving inward from screen edge down into notch left side)
-        path.addArc(
-            center: CGPoint(x: startX, y: outerR),
-            radius: outerR,
+        var p = Path()
+
+        // ── Top-left outer corner (screen bezel → notch left wall) ──
+        p.move(to: CGPoint(x: startX - tR, y: 0))
+        p.addArc(
+            center: CGPoint(x: startX, y: tR),
+            radius: tR,
             startAngle: .degrees(270),
-            endAngle: .degrees(180),
-            clockwise: true
+            endAngle:   .degrees(180),
+            clockwise:  true
         )
-        // Left vertical edge down to inner corner
-        path.addLine(to: CGPoint(x: startX, y: bottom - innerR))
-        // Inner bottom-left corner
-        path.addArc(
-            center: CGPoint(x: startX + innerR, y: bottom - innerR),
-            radius: innerR,
+
+        // ── Left wall ──
+        p.addLine(to: CGPoint(x: startX, y: bottom - bR))
+
+        // ── Bottom-left inner corner ──
+        p.addArc(
+            center: CGPoint(x: startX + bR, y: bottom - bR),
+            radius: bR,
             startAngle: .degrees(180),
-            endAngle: .degrees(90),
-            clockwise: true
+            endAngle:   .degrees(90),
+            clockwise:  true
         )
-        // Bottom edge
-        path.addLine(to: CGPoint(x: endX - innerR, y: bottom))
-        // Inner bottom-right corner
-        path.addArc(
-            center: CGPoint(x: endX - innerR, y: bottom - innerR),
-            radius: innerR,
+
+        // ── Bottom edge ──
+        p.addLine(to: CGPoint(x: endX - bR, y: bottom))
+
+        // ── Bottom-right inner corner ──
+        p.addArc(
+            center: CGPoint(x: endX - bR, y: bottom - bR),
+            radius: bR,
             startAngle: .degrees(90),
-            endAngle: .degrees(0),
-            clockwise: true
+            endAngle:   .degrees(0),
+            clockwise:  true
         )
-        // Right vertical edge up
-        path.addLine(to: CGPoint(x: endX, y: outerR))
-        // Outer right corner
-        path.addArc(
-            center: CGPoint(x: endX, y: outerR),
-            radius: outerR,
+
+        // ── Right wall ──
+        p.addLine(to: CGPoint(x: endX, y: tR))
+
+        // ── Top-right outer corner ──
+        p.addArc(
+            center: CGPoint(x: endX, y: tR),
+            radius: tR,
             startAngle: .degrees(0),
-            endAngle: .degrees(270),
-            clockwise: true
+            endAngle:   .degrees(270),
+            clockwise:  true
         )
-        path.closeSubpath()
-        return path
+
+        p.closeSubpath()
+        return p
     }
 }

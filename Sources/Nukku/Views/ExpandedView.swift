@@ -6,12 +6,12 @@ struct ExpandedView: View {
     var body: some View {
         let registry = WidgetRegistry.shared
         VStack(spacing: 0) {
-            // Widget tab bar
+            // ── Widget tab bar ──
             HStack(spacing: 20) {
                 ForEach(registry.enabledWidgets, id: \.id) { widget in
                     Button {
                         withAnimation(NotchAnimator.widgetSwitch) {
-                            viewModel.activeWidgetID = widget.id
+                            viewModel.setActive(widget.id)   // triggers activate/deactivate lifecycle
                         }
                     } label: {
                         Image(systemName: widget.iconName)
@@ -31,7 +31,7 @@ struct ExpandedView: View {
                 .background(Color.nukkuSeparator)
                 .padding(.horizontal, 16)
 
-            // Active widget content
+            // ── Active widget content ──
             if let activeID = viewModel.activeWidgetID,
                let widget = registry.enabledWidgets.first(where: { $0.id == activeID }) {
                 widget.makeBody()
@@ -40,7 +40,7 @@ struct ExpandedView: View {
                     .id(activeID)
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .move(edge: .trailing)),
-                        removal: .opacity.combined(with: .move(edge: .leading))
+                        removal:   .opacity.combined(with: .move(edge: .leading))
                     ))
             } else {
                 Spacer()

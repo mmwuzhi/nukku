@@ -1,7 +1,7 @@
 import SwiftUI
 import Observation
 
-enum NotchState {
+enum NotchState: Equatable {
     case collapsed
     case expanded
 }
@@ -11,28 +11,31 @@ enum NotchState {
 final class NotchViewModel {
     var state: NotchState = .collapsed
     var activeWidgetID: String? = nil
-    var notchWidth: CGFloat = Constants.Notch.defaultWidth
-    var notchHeight: CGFloat = Constants.Notch.defaultHeight
+
+    // Set once at launch from screen.safeAreaInsets.top; never animated
+    var collapsedHeight: CGFloat = Constants.Notch.collapsedHeight
 
     var isExpanded: Bool { state == .expanded }
 
-    var currentCornerRadius: CGFloat {
-        state == .expanded ? Constants.Notch.cornerRadiusExpanded : Constants.Notch.cornerRadiusCollapsed
+    // Rect for hitTest in hosting-view coordinates (y-down, origin top-left)
+    var targetInteractiveSize: CGSize {
+        isExpanded
+            ? CGSize(width: Constants.Notch.expandedWidth, height: Constants.Notch.expandedHeight)
+            : CGSize(width: Constants.Notch.collapsedWidth, height: collapsedHeight)
     }
 
     private var collapseTask: Task<Void, Never>?
 
+    // MARK: - Expand / Collapse
+
     func expand() {
         collapseTask?.cancel()
         collapseTask = nil
-        withAnimation(NotchAnimator.expandSpring) {
-            state = .expanded
-            notchWidth = Constants.Notch.expandedWidth
-            notchHeight = Constants.Notch.expandedHeight
-        }
         if activeWidgetID == nil {
             activeWidgetID = WidgetRegistry.shared.enabledWidgets.first?.id
         }
+        activateCurrentWidget()
+        state = .expanded
     }
 
     func collapse() {
@@ -40,11 +43,27 @@ final class NotchViewModel {
         collapseTask = Task {
             try? await Task.sleep(for: .seconds(Constants.Animation.collapseDelay))
             guard !Task.isCancelled else { return }
-            withAnimation(NotchAnimator.collapseSpring) {
-                state = .collapsed
-                notchWidth = Constants.Notch.defaultWidth
-                notchHeight = Constants.Notch.defaultHeight
-            }
+            deactivateCurrentWidget()
+            state = .collapsed
         }
+    }
+
+    // MARK: - Widget Lifecycle
+
+    func setActive(_ id: String) {
+        guard id != activeWidgetID else { return }
+        deactivateCurrentWidget()
+        activeWidgetID = id
+        activateCurrentWidget()
+    }
+
+    private func activateCurrentWidget() {
+        guard let id = activeWidgetID else { return }
+        WidgetRegistry.shared.widgets.first(where: { $0.id == id })?.activate()
+    }
+
+    private func deactivateCurrentWidget() {
+        guard let id = activeWidgetID else { return }
+        WidgetRegistry.shared.widgets.first(where: { $0.id == id })?.deactivate()
     }
 }
