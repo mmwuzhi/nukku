@@ -49,9 +49,9 @@ func makeWidgetBox<V: View>(
     iconName: String,
     preferredSize: CGSize = CGSize(width: 360, height: 180),
     isEnabled: Bool = true,
-    @ViewBuilder body: @escaping @MainActor () -> V,
     activate: @escaping @MainActor () -> Void = {},
-    deactivate: @escaping @MainActor () -> Void = {}
+    deactivate: @escaping @MainActor () -> Void = {},
+    @ViewBuilder body: @escaping @MainActor () -> V
 ) -> AnyNukkuWidgetBox {
     AnyNukkuWidgetBox(
         id: id,
