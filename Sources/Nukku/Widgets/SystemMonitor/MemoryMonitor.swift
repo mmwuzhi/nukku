@@ -21,7 +21,9 @@ struct MemoryMonitor {
         let total = ProcessInfo.processInfo.physicalMemory
         var used: UInt64 = 0
         if result == KERN_SUCCESS {
-            let page = UInt64(vm_page_size)
+            var pageSize: vm_size_t = 0
+            host_page_size(mach_host_self(), &pageSize)
+            let page = UInt64(pageSize)
             used = (UInt64(stats.active_count) + UInt64(stats.wire_count) + UInt64(stats.compressor_page_count)) * page
         }
         return Info(usedBytes: used, totalBytes: total)
