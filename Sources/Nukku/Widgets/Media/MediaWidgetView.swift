@@ -2,16 +2,25 @@ import SwiftUI
 import AppKit
 
 struct MediaWidgetView: View {
-    @Environment(MediaViewModel.self) private var vm
+    @Environment(MediaViewModel.self)  private var vm
+    @Environment(NotchViewModel.self)  private var notchVM
+    @Environment(\.notchNamespace)     private var notchNS
 
     var body: some View {
         HStack(spacing: 12) {
             // Album artwork
             Group {
                 if let image = vm.albumArtwork {
-                    Image(nsImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
+                    if let ns = notchNS {
+                        Image(nsImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .matchedGeometryEffect(id: "albumArt", in: ns, isSource: notchVM.isExpanded)
+                    } else {
+                        Image(nsImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    }
                 } else {
                     Image(systemName: "music.note")
                         .font(.system(size: 24))

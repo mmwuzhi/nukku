@@ -36,14 +36,12 @@ struct NotchShape: Shape, Animatable {
 
         var p = Path()
 
-        // ── Top-left outer corner (screen bezel → notch left wall) ──
+        // ── Top-left outer corner (squircle, kappa=0.6) ──
         p.move(to: CGPoint(x: startX - tR, y: 0))
-        p.addArc(
-            center: CGPoint(x: startX, y: tR),
-            radius: tR,
-            startAngle: .degrees(270),
-            endAngle:   .degrees(180),
-            clockwise:  true
+        p.addCurve(
+            to:       CGPoint(x: startX,             y: tR),
+            control1: CGPoint(x: startX - tR * 0.4,  y: 0),
+            control2: CGPoint(x: startX,              y: tR * 0.4)
         )
 
         // ── Left wall ──
@@ -73,13 +71,11 @@ struct NotchShape: Shape, Animatable {
         // ── Right wall ──
         p.addLine(to: CGPoint(x: endX, y: tR))
 
-        // ── Top-right outer corner ──
-        p.addArc(
-            center: CGPoint(x: endX, y: tR),
-            radius: tR,
-            startAngle: .degrees(0),
-            endAngle:   .degrees(270),
-            clockwise:  true
+        // ── Top-right outer corner (squircle, kappa=0.6) ──
+        p.addCurve(
+            to:       CGPoint(x: endX + tR,         y: 0),
+            control1: CGPoint(x: endX,               y: tR * 0.4),
+            control2: CGPoint(x: endX + tR * 0.4,   y: 0)
         )
 
         p.closeSubpath()

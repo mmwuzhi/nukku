@@ -5,22 +5,23 @@ extension NSScreen {
         safeAreaInsets.top > 0
     }
 
-    // Approximate notch rect in screen coordinates (origin bottom-left)
+    /// Exact notch width derived from the menu-bar flanking areas.
+    /// `auxiliaryTopLeftArea` and `auxiliaryTopRightArea` are the menu-bar segments
+    /// to the left and right of the notch; what remains is the notch itself.
+    var notchWidth: CGFloat {
+        guard hasNotch else { return 0 }
+        let left  = auxiliaryTopLeftArea?.width  ?? 0
+        let right = auxiliaryTopRightArea?.width ?? 0
+        return frame.width - left - right
+    }
+
     var notchRect: CGRect {
         guard hasNotch else { return .zero }
-        let notchHeight = safeAreaInsets.top
-        // Estimate notch width by machine model size (Apple has no public API for exact width)
-        let estimatedNotchWidth: CGFloat
-        switch frame.width {
-        case 3456...: estimatedNotchWidth = 255  // 16" MBP
-        case 2560...: estimatedNotchWidth = 270  // 14" MBP
-        default:      estimatedNotchWidth = 272
-        }
         return CGRect(
-            x: frame.midX - estimatedNotchWidth / 2,
-            y: frame.maxY - notchHeight,
-            width: estimatedNotchWidth,
-            height: notchHeight
+            x: frame.midX - notchWidth / 2,
+            y: frame.maxY - safeAreaInsets.top,
+            width:  notchWidth,
+            height: safeAreaInsets.top
         )
     }
 

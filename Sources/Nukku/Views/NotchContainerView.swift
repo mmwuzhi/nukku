@@ -4,6 +4,7 @@ struct NotchContainerView: View {
     @Environment(NotchViewModel.self)  private var vm
     @Environment(MediaViewModel.self)  private var mediaVM
     @Environment(HUDViewModel.self)    private var hudVM
+    @Namespace private var notchNS
 
     // @AppStorage is reactive directly in the view — avoids the @ObservationIgnored issue
     // in PreferencesManager which would freeze the branch at first render.
@@ -14,7 +15,7 @@ struct NotchContainerView: View {
     private var isHUDActive: Bool { !vm.isExpanded && hudVM.currentHUD != nil }
     private var targetWidth: CGFloat {
         if isHUDActive { return Constants.Notch.hudWidth }
-        return vm.isExpanded ? Constants.Notch.expandedWidth : Constants.Notch.collapsedWidth
+        return vm.isExpanded ? Constants.Notch.expandedWidth : vm.collapsedWidth
     }
     private var targetHeight: CGFloat {
         vm.isExpanded ? Constants.Notch.expandedHeight : vm.collapsedHeight
@@ -36,6 +37,15 @@ struct NotchContainerView: View {
                     color: .black.opacity(vm.isExpanded ? 0.30 : 0),
                     radius: 16, y: 8
                 )
+                .animation(shapeSpring, value: vm.state)
+                .animation(NotchAnimator.hudTransition, value: isHUDActive)
+
+            // ── 1b. Liquid Glass layer (macOS 26, visible when expanded) ──
+            Color.clear
+                .frame(width: targetWidth, height: targetHeight)
+                .glassEffect(.regular)
+                .clipShape(currentShape)
+                .opacity(vm.isExpanded ? 1 : 0)
                 .animation(shapeSpring, value: vm.state)
                 .animation(NotchAnimator.hudTransition, value: isHUDActive)
 
@@ -70,6 +80,7 @@ struct NotchContainerView: View {
             }
             .frame(width: targetWidth, height: targetHeight)
             .clipShape(currentShape)
+            .environment(\.notchNamespace, notchNS)
             .animation(shapeSpring, value: vm.state)
             .animation(NotchAnimator.hudTransition, value: isHUDActive)
         }

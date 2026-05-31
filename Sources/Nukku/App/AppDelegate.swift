@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let hudVM      = HUDViewModel()
 
     private var windowManager: NotchWindowManager?
+    private var notificationService: NotificationService?
     private let screenService = ScreenChangeService()
     private let launchService = LaunchAtLoginService()
 
@@ -25,8 +26,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             fileDropVM: fileDropVM
         )
 
-        // Start HUD monitoring (volume + brightness)
+        // Start HUD monitoring (volume + brightness) and notification interception
         hudVM.start()
+        let ns = NotificationService(hudVM: hudVM)
+        notificationService = ns
+        Task { await ns.start() }
 
         // Build and display the notch window
         let mgr = NotchWindowManager(notchViewModel: notchVM, mediaViewModel: mediaVM, hudViewModel: hudVM)

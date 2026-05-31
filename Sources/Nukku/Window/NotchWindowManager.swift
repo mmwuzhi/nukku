@@ -24,6 +24,7 @@ final class NotchWindowManager {
             ? screen.safeAreaInsets.top
             : NSStatusBar.system.thickness
         notchViewModel?.collapsedHeight = actualCollapsedH
+        if screen.hasNotch { notchViewModel?.collapsedWidth = screen.notchWidth }
 
         let frame = canvasFrame(for: screen)
 
@@ -91,6 +92,7 @@ final class NotchWindowManager {
             ? screen.safeAreaInsets.top
             : NSStatusBar.system.thickness
         notchViewModel?.collapsedHeight = actualCollapsedH
+        if screen.hasNotch { notchViewModel?.collapsedWidth = screen.notchWidth }
 
         panel.setFrame(canvasFrame(for: screen), display: false)
     }

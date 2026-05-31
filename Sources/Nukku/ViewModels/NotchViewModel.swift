@@ -12,8 +12,9 @@ final class NotchViewModel {
     var state: NotchState = .collapsed
     var activeWidgetID: String? = nil
 
-    // Set once at launch from screen.safeAreaInsets.top; never animated
+    // Set once at launch from screen geometry; never animated
     var collapsedHeight: CGFloat = Constants.Notch.collapsedHeight
+    var collapsedWidth:  CGFloat = Constants.Notch.collapsedWidth
 
     var isExpanded: Bool { state == .expanded }
 
@@ -21,7 +22,7 @@ final class NotchViewModel {
     var targetInteractiveSize: CGSize {
         isExpanded
             ? CGSize(width: Constants.Notch.expandedWidth, height: Constants.Notch.expandedHeight)
-            : CGSize(width: Constants.Notch.collapsedWidth, height: collapsedHeight)
+            : CGSize(width: collapsedWidth, height: collapsedHeight)
     }
 
     private var collapseTask: Task<Void, Never>?
