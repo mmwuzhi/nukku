@@ -38,14 +38,24 @@ final class NotchViewModel {
         state = .expanded
     }
 
+    /// Delayed collapse — respects user's collapseDelay preference.
     func collapse() {
         collapseTask?.cancel()
+        let delay = PreferencesManager.shared.collapseDelay
         collapseTask = Task {
-            try? await Task.sleep(for: .seconds(Constants.Animation.collapseDelay))
+            try? await Task.sleep(for: .seconds(delay))
             guard !Task.isCancelled else { return }
             deactivateCurrentWidget()
             state = .collapsed
         }
+    }
+
+    /// Immediate collapse — used by click-toggle mode and HUD dismiss.
+    func forceCollapse() {
+        collapseTask?.cancel()
+        collapseTask = nil
+        deactivateCurrentWidget()
+        state = .collapsed
     }
 
     // MARK: - Widget Lifecycle

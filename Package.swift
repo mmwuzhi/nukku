@@ -16,6 +16,9 @@ let package = Package(
             path: "Sources/Nukku",
             swiftSettings: [
                 .swiftLanguageMode(.v6)
+            ],
+            linkerSettings: [
+                .linkedFramework("IOKit")
             ]
         ),
         .testTarget(

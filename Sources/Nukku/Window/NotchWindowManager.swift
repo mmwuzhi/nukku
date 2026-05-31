@@ -6,10 +6,12 @@ final class NotchWindowManager {
     private var panel: NotchPanel?
     private weak var notchViewModel: NotchViewModel?
     private let mediaViewModel: MediaViewModel
+    private let hudViewModel: HUDViewModel
 
-    init(notchViewModel: NotchViewModel, mediaViewModel: MediaViewModel) {
+    init(notchViewModel: NotchViewModel, mediaViewModel: MediaViewModel, hudViewModel: HUDViewModel) {
         self.notchViewModel = notchViewModel
         self.mediaViewModel = mediaViewModel
+        self.hudViewModel   = hudViewModel
     }
 
     // MARK: - Setup
@@ -49,6 +51,7 @@ final class NotchWindowManager {
         let content = NotchContainerView()
             .environment(notchVM)
             .environment(mediaViewModel)
+            .environment(hudViewModel)
 
         let hostingView = NotchHostingView(rootView: content)
         hostingView.frame = NSRect(

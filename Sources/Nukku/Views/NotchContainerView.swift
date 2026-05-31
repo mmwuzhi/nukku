@@ -1,16 +1,27 @@
 import SwiftUI
 
 struct NotchContainerView: View {
-    @Environment(NotchViewModel.self) private var vm
-    @Environment(MediaViewModel.self) private var mediaVM
+    @Environment(NotchViewModel.self)  private var vm
+    @Environment(MediaViewModel.self)  private var mediaVM
+    @Environment(HUDViewModel.self)    private var hudVM
 
-    // ── Geometry derived from state (View owns the geometry, ViewModel doesn't) ──
-    private var targetWidth:  CGFloat { vm.isExpanded ? Constants.Notch.expandedWidth  : Constants.Notch.collapsedWidth }
-    private var targetHeight: CGFloat { vm.isExpanded ? Constants.Notch.expandedHeight : vm.collapsedHeight }
-    private var bottomRadius: CGFloat { vm.isExpanded ? Constants.Notch.cornerRadiusExpanded : Constants.Notch.cornerRadiusCollapsed }
+    private let prefs = PreferencesManager.shared
 
-    // ── Spring selection ──
-    private var shapeSpring: Animation { vm.isExpanded ? NotchAnimator.expand : NotchAnimator.collapse }
+    // ── Geometry derived from state ──
+    private var isHUDActive: Bool { !vm.isExpanded && hudVM.currentHUD != nil }
+    private var targetWidth: CGFloat {
+        if isHUDActive { return Constants.Notch.hudWidth }
+        return vm.isExpanded ? Constants.Notch.expandedWidth : Constants.Notch.collapsedWidth
+    }
+    private var targetHeight: CGFloat {
+        vm.isExpanded ? Constants.Notch.expandedHeight : vm.collapsedHeight
+    }
+    private var bottomRadius: CGFloat {
+        vm.isExpanded ? Constants.Notch.cornerRadiusExpanded : Constants.Notch.cornerRadiusCollapsed
+    }
+    private var shapeSpring: Animation {
+        vm.isExpanded ? NotchAnimator.expand : NotchAnimator.collapse
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -18,54 +29,58 @@ struct NotchContainerView: View {
             // ── 1. Notch silhouette ──
             currentShape
                 .fill(Color.black)
-                // Shadow appears only when expanded
                 .shadow(
                     color: .black.opacity(vm.isExpanded ? 0.30 : 0),
                     radius: 16, y: 8
                 )
                 .animation(shapeSpring, value: vm.state)
+                .animation(.spring(response: 0.28, dampingFraction: 0.80), value: isHUDActive)
 
-            // ── 2. Content layer (clipped to notch shape) ──
+            // ── 2. Content layer ──
             ZStack {
-                // Collapsed content: visible when collapsed, hidden instantly when expanding
+                // HUD overlay (collapsed only)
+                if let hud = hudVM.currentHUD, !vm.isExpanded {
+                    HUDView(hud: hud)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                }
+
+                // Collapsed media/clock content
                 CollapsedView()
                     .environment(mediaVM)
-                    .opacity(vm.isExpanded ? 0 : 1)
+                    .opacity(vm.isExpanded || isHUDActive ? 0 : 1)
                     .animation(
                         vm.isExpanded
-                            ? NotchAnimator.contentHide               // snap out on expand
-                            : NotchAnimator.contentReveal.delay(0.15), // wait for shape to close
+                            ? NotchAnimator.contentHide
+                            : NotchAnimator.contentReveal.delay(0.15),
                         value: vm.state
                     )
 
-                // Expanded content: hidden when collapsed, fades in after shape starts opening
+                // Expanded panel content
                 ExpandedView()
                     .opacity(vm.isExpanded ? 1 : 0)
                     .animation(
                         vm.isExpanded
-                            ? NotchAnimator.contentReveal.delay(0.08)  // let shape open first
-                            : NotchAnimator.contentHide,               // snap out on collapse
+                            ? NotchAnimator.contentReveal.delay(0.08)
+                            : NotchAnimator.contentHide,
                         value: vm.state
                     )
             }
             .frame(width: targetWidth, height: targetHeight)
             .clipShape(currentShape)
             .animation(shapeSpring, value: vm.state)
+            .animation(.spring(response: 0.28, dampingFraction: 0.80), value: isHUDActive)
         }
-        // Fixed canvas frame — the window NEVER resizes
         .frame(
             width:  Constants.Notch.canvasWidth,
             height: Constants.Notch.canvasHeight,
             alignment: .top
         )
-        // Hover area tracks the animated notch shape exactly
         .contentShape(currentShape)
-        .onHover { hovering in
-            if hovering { vm.expand() } else { vm.collapse() }
-        }
+        // ── Interaction: hover vs click (B1 prefs gate) ──
+        .modifier(NotchInteractionModifier(vm: vm, prefs: prefs))
+        .animation(.spring(response: 0.28, dampingFraction: 0.80), value: hudVM.currentHUD != nil)
     }
 
-    // Single source of truth for shape parameters
     private var currentShape: NotchShape {
         NotchShape(
             width:        targetWidth,
@@ -73,5 +88,26 @@ struct NotchContainerView: View {
             topRadius:    Constants.Notch.outerCornerRadius,
             bottomRadius: bottomRadius
         )
+    }
+}
+
+// MARK: - Interaction modifier (hover vs click)
+
+private struct NotchInteractionModifier: ViewModifier {
+    let vm: NotchViewModel
+    let prefs: PreferencesManager
+
+    func body(content: Content) -> some View {
+        if prefs.expandTrigger == .hover {
+            content
+                .onHover { hovering in
+                    if hovering { vm.expand() } else { vm.collapse() }
+                }
+        } else {
+            content
+                .onTapGesture {
+                    if vm.isExpanded { vm.forceCollapse() } else { vm.expand() }
+                }
+        }
     }
 }

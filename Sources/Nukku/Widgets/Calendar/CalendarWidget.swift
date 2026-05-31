@@ -7,7 +7,8 @@ enum CalendarWidget {
             id: "calendar",
             displayName: "日历",
             iconName: "calendar",
-            activate: { Task { await viewModel.activate() } }
+            activate: { Task { await viewModel.activate() } },
+            deactivate: { viewModel.deactivate() }
         ) {
             CalendarWidgetView()
                 .environment(viewModel)

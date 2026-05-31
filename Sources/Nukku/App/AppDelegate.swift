@@ -3,11 +3,12 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     // ViewModels — owned here, injected into window & registry
-    let notchVM = NotchViewModel()
-    let mediaVM = MediaViewModel()
-    let systemVM = SystemMonitorViewModel()
+    let notchVM    = NotchViewModel()
+    let mediaVM    = MediaViewModel()
+    let systemVM   = SystemMonitorViewModel()
     let calendarVM = CalendarViewModel()
     let fileDropVM = FileDropViewModel()
+    let hudVM      = HUDViewModel()
 
     private var windowManager: NotchWindowManager?
     private let screenService = ScreenChangeService()
@@ -24,8 +25,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             fileDropVM: fileDropVM
         )
 
+        // Start HUD monitoring (volume + brightness)
+        hudVM.start()
+
         // Build and display the notch window
-        let mgr = NotchWindowManager(notchViewModel: notchVM, mediaViewModel: mediaVM)
+        let mgr = NotchWindowManager(notchViewModel: notchVM, mediaViewModel: mediaVM, hudViewModel: hudVM)
         mgr.setupWindow()
         windowManager = mgr
 
@@ -39,6 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        hudVM.stop()
         windowManager?.teardown()
     }
 }

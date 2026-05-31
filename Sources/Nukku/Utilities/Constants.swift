@@ -14,6 +14,9 @@ enum Constants {
         static let expandedWidth: CGFloat  = 420
         static let expandedHeight: CGFloat = 260
 
+        // HUD popup (volume/brightness) — same height, slightly wider than collapsed
+        static let hudWidth: CGFloat = 320
+
         // Corner radii
         static let cornerRadiusCollapsed: CGFloat = 8    // bottom inner corners, collapsed
         static let cornerRadiusExpanded: CGFloat  = 20   // bottom inner corners, expanded
