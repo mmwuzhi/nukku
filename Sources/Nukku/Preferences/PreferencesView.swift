@@ -51,6 +51,20 @@ struct PreferencesView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            Section("全局快捷键") {
+                Toggle("启用快捷键", isOn: $prefs.hotkeyEnabled)
+                if prefs.hotkeyEnabled {
+                    Picker("快捷键", selection: $prefs.hotkeyPreset) {
+                        ForEach(HotkeyPreset.allCases) { preset in
+                            Text(preset.label).tag(preset)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    Text("需要在系统设置 › 隐私与安全性 › 辅助功能中授权此 app")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
         .formStyle(.grouped)
         .padding()

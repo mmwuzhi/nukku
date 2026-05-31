@@ -15,18 +15,42 @@ final class WidgetRegistry {
         mediaVM: MediaViewModel,
         systemVM: SystemMonitorViewModel,
         calendarVM: CalendarViewModel,
-        fileDropVM: FileDropViewModel
+        fileDropVM: FileDropViewModel,
+        appLauncherVM: AppLauncherViewModel,
+        shortcutsVM: ShortcutsViewModel,
+        cameraVM: CameraViewModel
     ) {
         widgets = [
             MediaWidget.box(viewModel: mediaVM),
             ClockWidget.box(),
             SystemMonitorWidget.box(viewModel: systemVM),
             CalendarWidget.box(viewModel: calendarVM),
-            FileDropWidget.box(viewModel: fileDropVM)
+            FileDropWidget.box(viewModel: fileDropVM),
+            AppLauncherWidget.box(viewModel: appLauncherVM),
+            ShortcutsWidget.box(viewModel: shortcutsVM),
+            CameraWidget.box(viewModel: cameraVM)
         ]
     }
 
     var enabledWidgets: [AnyNukkuWidgetBox] {
         widgets.filter(\.isEnabled)
+    }
+
+    func nextEnabledID(after id: String?) -> String? {
+        let enabled = enabledWidgets
+        guard !enabled.isEmpty else { return nil }
+        guard let id, let idx = enabled.firstIndex(where: { $0.id == id }) else {
+            return enabled.first?.id
+        }
+        return enabled[(idx + 1) % enabled.count].id
+    }
+
+    func prevEnabledID(before id: String?) -> String? {
+        let enabled = enabledWidgets
+        guard !enabled.isEmpty else { return nil }
+        guard let id, let idx = enabled.firstIndex(where: { $0.id == id }) else {
+            return enabled.last?.id
+        }
+        return enabled[(idx - 1 + enabled.count) % enabled.count].id
     }
 }

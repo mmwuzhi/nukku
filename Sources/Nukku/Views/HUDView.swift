@@ -14,7 +14,7 @@ struct HUDView: View {
         }
     }
 
-    // MARK: - Vol / Brightness layout
+    // MARK: - Vol / Brightness / Battery layout
 
     private var progressLayout: some View {
         HStack(spacing: 8) {
@@ -33,6 +33,13 @@ struct HUDView: View {
                 }
             }
             .frame(height: 4)
+
+            if let label = hud.percentLabel {
+                Text(label)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, alignment: .trailing)
+            }
         }
         .padding(.horizontal, 14)
         .frame(width: Constants.Notch.hudWidth, height: 28)

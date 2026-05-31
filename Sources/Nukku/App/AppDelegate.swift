@@ -3,12 +3,15 @@ import AppKit
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     // ViewModels — owned here, injected into window & registry
-    let notchVM    = NotchViewModel()
-    let mediaVM    = MediaViewModel()
-    let systemVM   = SystemMonitorViewModel()
-    let calendarVM = CalendarViewModel()
-    let fileDropVM = FileDropViewModel()
-    let hudVM      = HUDViewModel()
+    let notchVM         = NotchViewModel()
+    let mediaVM         = MediaViewModel()
+    let systemVM        = SystemMonitorViewModel()
+    let calendarVM      = CalendarViewModel()
+    let fileDropVM      = FileDropViewModel()
+    let hudVM           = HUDViewModel()
+    let appLauncherVM   = AppLauncherViewModel()
+    let shortcutsVM     = ShortcutsViewModel()
+    let cameraVM        = CameraViewModel()
 
     private var windowManager: NotchWindowManager?
     private var notificationService: NotificationService?
@@ -20,13 +23,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Register widgets with shared registry
         WidgetRegistry.shared.registerDefaults(
-            mediaVM: mediaVM,
-            systemVM: systemVM,
-            calendarVM: calendarVM,
-            fileDropVM: fileDropVM
+            mediaVM:       mediaVM,
+            systemVM:      systemVM,
+            calendarVM:    calendarVM,
+            fileDropVM:    fileDropVM,
+            appLauncherVM: appLauncherVM,
+            shortcutsVM:   shortcutsVM,
+            cameraVM:      cameraVM
         )
 
-        // Start HUD monitoring (volume + brightness) and notification interception
+        // Start HUD monitoring (volume + brightness + battery) and notification interception
         hudVM.start()
         let ns = NotificationService(hudVM: hudVM)
         notificationService = ns

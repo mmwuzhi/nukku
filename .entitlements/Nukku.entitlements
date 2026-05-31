@@ -15,5 +15,8 @@
     <!-- Calendar widget: EventKit full access -->
     <key>com.apple.security.personal-information.calendars</key>
     <true/>
+    <!-- Camera widget: AVCaptureSession access -->
+    <key>com.apple.security.device.camera</key>
+    <true/>
 </dict>
 </plist>

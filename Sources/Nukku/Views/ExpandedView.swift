@@ -11,7 +11,7 @@ struct ExpandedView: View {
                 ForEach(registry.enabledWidgets, id: \.id) { widget in
                     Button {
                         withAnimation(NotchAnimator.widgetSwitch) {
-                            viewModel.setActive(widget.id)   // triggers activate/deactivate lifecycle
+                            viewModel.setActive(widget.id)
                         }
                     } label: {
                         Image(systemName: widget.iconName)
@@ -46,5 +46,22 @@ struct ExpandedView: View {
                 Spacer()
             }
         }
+        .gesture(
+            DragGesture(minimumDistance: 40)
+                .onEnded { value in
+                    guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                    withAnimation(NotchAnimator.widgetSwitch) {
+                        if value.translation.width < 0 {
+                            if let next = registry.nextEnabledID(after: viewModel.activeWidgetID) {
+                                viewModel.setActive(next)
+                            }
+                        } else {
+                            if let prev = registry.prevEnabledID(before: viewModel.activeWidgetID) {
+                                viewModel.setActive(prev)
+                            }
+                        }
+                    }
+                }
+        )
     }
 }

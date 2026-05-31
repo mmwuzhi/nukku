@@ -17,8 +17,8 @@ struct CollapsedView: View {
             }
 
             if mediaVM.isPlaying {
-                MusicWaveIndicator()
-                    .frame(width: 14, height: 14)
+                MusicEQVisualizer()
+                    .frame(width: 18, height: 14)
                     .foregroundStyle(.white)
             }
             if let title = mediaVM.nowPlayingTitle {
@@ -33,26 +33,25 @@ struct CollapsedView: View {
     }
 }
 
-// Animated bars indicating music playback
-struct MusicWaveIndicator: View {
-    @State private var phase = false
-
-    private let barCount = 3
-    private let barHeights: [CGFloat] = [0.5, 1.0, 0.7]
+// 7-bar EQ visualizer with independent per-bar random animation.
+struct MusicEQVisualizer: View {
+    @State private var heights: [CGFloat] = Array(repeating: 4, count: 7)
+    // @State preserves the publisher across re-renders, avoiding timer restarts.
+    @State private var ticker = Timer.publish(every: 0.11, on: .main, in: .common).autoconnect()
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 2) {
-            ForEach(0..<barCount, id: \.self) { i in
-                RoundedRectangle(cornerRadius: 1)
-                    .frame(width: 2, height: phase ? barHeights[i] * 14 : 4)
+        HStack(alignment: .bottom, spacing: 1) {
+            ForEach(0..<7, id: \.self) { i in
+                Capsule()
+                    .frame(width: 1.5, height: heights[i])
                     .animation(
-                        .easeInOut(duration: 0.4)
-                            .repeatForever()
-                            .delay(Double(i) * 0.1),
-                        value: phase
+                        .easeInOut(duration: 0.10 + Double(i % 3) * 0.02),
+                        value: heights[i]
                     )
             }
         }
-        .onAppear { phase = true }
+        .onReceive(ticker) { _ in
+            for i in 0..<7 { heights[i] = .random(in: 3...14) }
+        }
     }
 }

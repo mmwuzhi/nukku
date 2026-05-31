@@ -7,6 +7,7 @@ final class NotchWindowManager {
     private weak var notchViewModel: NotchViewModel?
     private let mediaViewModel: MediaViewModel
     private let hudViewModel: HUDViewModel
+    private let hotkeyService = HotkeyService()
 
     init(notchViewModel: NotchViewModel, mediaViewModel: MediaViewModel, hudViewModel: HUDViewModel) {
         self.notchViewModel = notchViewModel
@@ -81,6 +82,12 @@ final class NotchWindowManager {
 
         self.panel = panel
         panel.orderFrontRegardless()
+
+        // Start global hotkey (checks enabled flag on each keypress)
+        hotkeyService.start { [weak self] in
+            guard let vm = self?.notchViewModel else { return }
+            if vm.isExpanded { vm.forceCollapse() } else { vm.expand() }
+        }
     }
 
     // MARK: - Reposition (screen change only, no animation)
@@ -98,6 +105,7 @@ final class NotchWindowManager {
     }
 
     func teardown() {
+        hotkeyService.stop()
         panel?.close()
         panel = nil
     }
