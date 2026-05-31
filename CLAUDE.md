@@ -104,9 +104,20 @@ The `activate`/`deactivate` callbacks are called automatically by `NotchViewMode
 
 See the plan file at `.claude/plans/` for the full feature checklist. Short version:
 
-**Done**: fixed-window arch, widget framework, Media/Clock/SystemMonitor/FileDrop/Calendar widgets, HUD (volume + brightness), preferences apply correctly, calendar auto-refresh.
+**Done**: fixed-window arch, widget framework, Media/Clock/SystemMonitor/FileDrop/Calendar widgets, HUD (volume + brightness + notifications), preferences, calendar auto-refresh, F2 notification HUD, P2 visual polish (matchedGeometryEffect, Liquid Glass, squircle corners, exact notch width), security hardening.
 
 **Pending**:
-- F2: system notification interception (UNUserNotificationCenter delegate)
 - F3: camera preview widget (AVCaptureSession)
-- P2 visual polish: matchedGeometryEffect album art, liquid outer corners, per-model notch width, Liquid Glass background
+
+## Codesigning (required before distribution)
+
+```bash
+swift build -c release
+codesign --options runtime \
+         --entitlements .entitlements/Nukku.entitlements \
+         --timestamp \
+         -s "Apple Development" \
+         .build/release/Nukku
+```
+
+The `.entitlements/Nukku.entitlements` file enables hardened runtime (blocks `DYLD_INSERT_LIBRARIES` injection) while keeping library validation active (Apple-signed MediaRemote.framework loads correctly). Entitlements declared: user-selected file read-write (FileDrop), calendar access (Calendar widget).

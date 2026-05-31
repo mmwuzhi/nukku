@@ -42,7 +42,8 @@ final class MediaViewModel {
         let info = await client.fetchNowPlayingInfo()
         nowPlayingTitle = info[MediaRemoteClient.InfoKey.title] as? String
         nowPlayingArtist = info[MediaRemoteClient.InfoKey.artist] as? String
-        if let data = info[MediaRemoteClient.InfoKey.artworkData] as? Data {
+        if let data = info[MediaRemoteClient.InfoKey.artworkData] as? Data,
+           data.count <= 10_000_000 {
             albumArtwork = NSImage(data: data)
         } else {
             albumArtwork = nil

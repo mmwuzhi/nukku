@@ -23,8 +23,9 @@ final class NetworkMonitor {
             let isUp = flags & IFF_UP != 0
             let isLink = cur.pointee.ifa_addr?.pointee.sa_family == UInt8(AF_LINK)
 
-            if !isLoopback && isUp && isLink {
-                let data = cur.pointee.ifa_data.load(as: if_data.self)
+            if !isLoopback && isUp && isLink,
+               let rawData = cur.pointee.ifa_data {
+                let data = rawData.load(as: if_data.self)
                 up   += Int64(data.ifi_obytes)
                 down += Int64(data.ifi_ibytes)
             }

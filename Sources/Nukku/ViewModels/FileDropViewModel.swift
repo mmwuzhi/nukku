@@ -18,9 +18,10 @@ final class FileDropViewModel {
             provider.loadItem(forTypeIdentifier: "public.file-url") { [weak self] item, _ in
                 guard let data = item as? Data,
                       let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-                let icon = NSWorkspace.shared.icon(forFile: url.path)
+                let resolvedURL = url.resolvingSymlinksInPath()
+                let icon = NSWorkspace.shared.icon(forFile: resolvedURL.path)
                 Task { @MainActor [weak self] in
-                    self?.files.insert(DroppedFile(url: url, icon: icon), at: 0)
+                    self?.files.insert(DroppedFile(url: resolvedURL, icon: icon), at: 0)
                 }
             }
         }

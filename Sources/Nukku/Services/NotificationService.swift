@@ -35,11 +35,13 @@ extension NotificationService: UNUserNotificationCenterDelegate {
         let content = notification.request.content
         Task { @MainActor [weak self] in
             guard let self, let hudVM = self.hudVM else { return }
-            let appName = Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String
-                          ?? Bundle.main.bundleIdentifier
-                          ?? "Nukku"
-            let title   = content.title.isEmpty ? content.subtitle : content.title
-            let icon    = NSApp.applicationIconImage
+            let appName  = Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String
+                           ?? Bundle.main.bundleIdentifier
+                           ?? "Nukku"
+            let rawTitle = content.title.isEmpty ? content.subtitle : content.title
+            let title    = String(rawTitle.prefix(120))
+                           .trimmingCharacters(in: .controlCharacters)
+            let icon     = NSApp.applicationIconImage
             hudVM.show(.notification(
                 appName: appName,
                 title:   title.isEmpty ? appName : title,

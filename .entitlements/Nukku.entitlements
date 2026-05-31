@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Hardened Runtime: prevent DYLD_INSERT_LIBRARIES injection -->
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <false/>
+    <!-- Keep library validation enabled; Apple-signed private frameworks (MediaRemote) load fine -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <false/>
+    <!-- FileDrop widget: read and reveal user-selected files -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+    <!-- Calendar widget: EventKit full access -->
+    <key>com.apple.security.personal-information.calendars</key>
+    <true/>
+</dict>
+</plist>
