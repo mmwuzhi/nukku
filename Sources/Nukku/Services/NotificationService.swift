@@ -32,13 +32,14 @@ extension NotificationService: UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        let content = notification.request.content
+        let contentTitle = notification.request.content.title
+        let contentSubtitle = notification.request.content.subtitle
         Task { @MainActor [weak self] in
             guard let self, let hudVM = self.hudVM else { return }
             let appName  = Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String
                            ?? Bundle.main.bundleIdentifier
                            ?? "Nukku"
-            let rawTitle = content.title.isEmpty ? content.subtitle : content.title
+            let rawTitle = contentTitle.isEmpty ? contentSubtitle : contentTitle
             let title    = String(rawTitle.prefix(120))
                            .trimmingCharacters(in: .controlCharacters)
             let icon     = NSApp.applicationIconImage

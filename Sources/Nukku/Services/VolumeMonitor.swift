@@ -8,7 +8,7 @@ import Foundation
 /// Note: CoreAudio listener blocks are C-level callbacks. Strict Swift 6
 /// concurrency warnings in this file can be suppressed with @preconcurrency;
 /// correctness is ensured by dispatching all state mutations via DispatchQueue.main.
-final class VolumeMonitor {
+final class VolumeMonitor: @unchecked Sendable {
     /// Called on main thread with (volume 0–1, isMuted).
     var onChange: @Sendable (Float, Bool) -> Void = { _, _ in }
 

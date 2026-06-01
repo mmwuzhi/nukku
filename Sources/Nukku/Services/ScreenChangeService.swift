@@ -17,7 +17,7 @@ final class ScreenChangeService {
         }
     }
 
-    deinit {
+    isolated deinit {
         if let observer {
             NotificationCenter.default.removeObserver(observer)
         }

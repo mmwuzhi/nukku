@@ -70,7 +70,7 @@ final class MediaViewModel {
         }
     }
 
-    deinit {
+    isolated deinit {
         observerTokens.forEach { NotificationCenter.default.removeObserver($0) }
     }
 

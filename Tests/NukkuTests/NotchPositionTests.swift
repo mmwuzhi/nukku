@@ -6,29 +6,39 @@ struct WidgetRegistryTests {
     @Test("Registers correct number of default widgets")
     @MainActor
     func defaultWidgetCount() async {
-        let mediaVM    = MediaViewModel()
-        let systemVM   = SystemMonitorViewModel()
-        let calVM      = CalendarViewModel()
-        let fileVM     = FileDropViewModel()
-        let registry   = WidgetRegistry.shared
+        let mediaVM       = MediaViewModel()
+        let systemVM      = SystemMonitorViewModel()
+        let calVM         = CalendarViewModel()
+        let fileVM        = FileDropViewModel()
+        let launcherVM    = AppLauncherViewModel()
+        let shortcutsVM   = ShortcutsViewModel()
+        let cameraVM      = CameraViewModel()
+        let registry      = WidgetRegistry.shared
         registry.registerDefaults(
             mediaVM: mediaVM, systemVM: systemVM,
-            calendarVM: calVM, fileDropVM: fileVM
+            calendarVM: calVM, fileDropVM: fileVM,
+            appLauncherVM: launcherVM, shortcutsVM: shortcutsVM,
+            cameraVM: cameraVM
         )
-        #expect(registry.widgets.count == 5)
+        #expect(registry.widgets.count == 8)
     }
 
     @Test("All default widgets enabled")
     @MainActor
     func allEnabledByDefault() async {
-        let mediaVM    = MediaViewModel()
-        let systemVM   = SystemMonitorViewModel()
-        let calVM      = CalendarViewModel()
-        let fileVM     = FileDropViewModel()
-        let registry   = WidgetRegistry.shared
+        let mediaVM       = MediaViewModel()
+        let systemVM      = SystemMonitorViewModel()
+        let calVM         = CalendarViewModel()
+        let fileVM        = FileDropViewModel()
+        let launcherVM    = AppLauncherViewModel()
+        let shortcutsVM   = ShortcutsViewModel()
+        let cameraVM      = CameraViewModel()
+        let registry      = WidgetRegistry.shared
         registry.registerDefaults(
             mediaVM: mediaVM, systemVM: systemVM,
-            calendarVM: calVM, fileDropVM: fileVM
+            calendarVM: calVM, fileDropVM: fileVM,
+            appLauncherVM: launcherVM, shortcutsVM: shortcutsVM,
+            cameraVM: cameraVM
         )
         #expect(registry.enabledWidgets.count == registry.widgets.count)
     }
