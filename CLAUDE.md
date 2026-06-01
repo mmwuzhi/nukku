@@ -13,9 +13,14 @@ swift build
 # Run tests (cross-platform, limited to non-AppKit logic)
 swift test
 
-# Run the app
-swift run
+# Run the app — must be wrapped as .app, see below
+./Scripts/package.sh --run
 ```
+
+The bare executable cannot be run directly (`swift run`, `./.build/release/Nukku`) because
+`UNUserNotificationCenter` and other system services require a bundle identity (Info.plist +
+CFBundleIdentifier). `Scripts/package.sh` builds release, wraps it as `.build/Nukku.app`, and
+ad-hoc codesigns it with the entitlements in `.entitlements/Nukku.entitlements`.
 
 No Xcode project file — pure Swift Package Manager. Target: macOS 26+, Swift 6 strict concurrency.
 
@@ -111,13 +116,15 @@ See the plan file at `.claude/plans/` for the full feature checklist. Short vers
 
 ## Codesigning (required before distribution)
 
+For local development, `Scripts/package.sh` ad-hoc signs automatically. For distribution use a
+real Developer ID:
+
 ```bash
-swift build -c release
-codesign --options runtime \
-         --entitlements .entitlements/Nukku.entitlements \
-         --timestamp \
-         -s "Apple Development" \
-         .build/release/Nukku
+NUKKU_SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./Scripts/package.sh
 ```
 
-The `.entitlements/Nukku.entitlements` file enables hardened runtime (blocks `DYLD_INSERT_LIBRARIES` injection) while keeping library validation active (Apple-signed MediaRemote.framework loads correctly). Entitlements declared: user-selected file read-write (FileDrop), calendar access (Calendar widget).
+The script applies `--options runtime` + `--timestamp` when a real identity is provided. The
+`.entitlements/Nukku.entitlements` file enables hardened runtime (blocks `DYLD_INSERT_LIBRARIES`
+injection) while keeping library validation active (Apple-signed MediaRemote.framework loads
+correctly). Entitlements declared: user-selected file read-write (FileDrop), calendar access
+(Calendar widget), camera access (Camera widget).
