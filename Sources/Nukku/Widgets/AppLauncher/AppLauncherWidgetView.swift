@@ -5,7 +5,7 @@ struct AppLauncherWidgetView: View {
     @Environment(AppLauncherViewModel.self) private var vm
     @State private var deleteTargetID: String? = nil
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 4)
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
 
     var body: some View {
         ScrollView {
@@ -70,10 +70,10 @@ struct AppLauncherWidgetView: View {
             VStack(spacing: 4) {
                 Image(systemName: "plus")
                     .font(.system(size: 20, weight: .light))
-                    .foregroundStyle(.white.opacity(0.4))
+                    .foregroundStyle(.white.opacity(0.65))
                 Text("添加")
                     .font(.system(size: 9))
-                    .foregroundStyle(.white.opacity(0.3))
+                    .foregroundStyle(.white.opacity(0.60))
             }
             .frame(width: 68, height: 64)
             .background(.white.opacity(0.03), in: RoundedRectangle(cornerRadius: 10))

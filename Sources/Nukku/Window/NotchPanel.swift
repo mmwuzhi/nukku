@@ -1,6 +1,8 @@
 import AppKit
 
 final class NotchPanel: NSPanel {
+    var handleLeftMouseDownInScreen: ((CGPoint) -> Bool)?
+
     override var canBecomeKey:  Bool { true  }
     override var canBecomeMain: Bool { false }
 
@@ -9,5 +11,14 @@ final class NotchPanel: NSPanel {
     /// frame unchanged.
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
         frameRect
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .leftMouseDown,
+           let screenPoint = event.window?.convertPoint(toScreen: event.locationInWindow),
+           handleLeftMouseDownInScreen?(screenPoint) == true {
+            return
+        }
+        super.sendEvent(event)
     }
 }

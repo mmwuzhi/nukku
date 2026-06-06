@@ -2,7 +2,12 @@
 
 ## Project Overview
 
-Nukku is a macOS notch utility app (similar to Alcove / NotchNook) built with Swift 6.2 and SwiftUI on macOS 26 (Tahoe). It lives in the MacBook notch area, expanding on hover/click to show widgets, and showing slim HUD overlays for volume/brightness changes.
+Nukku is a macOS notch utility app (similar to Alcove / NotchNook) built with Swift 6.2 and SwiftUI on macOS 26 (Tahoe). It lives in the MacBook notch area, using a fused Dynamic-Island-style silhouette with:
+
+- an always-visible rest pill in the notch area
+- hover/click expansion into widgets
+- slim HUD overlays for volume, brightness, battery, and notifications
+- collapsed media controls with browser and Spotify-aware now-playing detection
 
 ## Build & Run
 
@@ -40,6 +45,19 @@ The `NSPanel` is created at a fixed size (700 × 340 pt) and **never resized**. 
 
 Coordinate note: `NSHostingView.isFlipped == true` (y=0 at top). The `hitTest` parameter arrives in the superview's coordinate system; `convert(point, from: nil)` converts from window coords (y-up) to view coords (y-down).
 
+### Hover + Transport Input
+
+Hover detection does not use SwiftUI `.onHover`. `NotchWindowManager` owns it via AppKit:
+
+- a global mouse-move monitor wakes tracking only when the pointer enters the top-center screen band
+- once active, a 15 Hz timer samples `NSEvent.mouseLocation`
+- separate screen-space rects gate:
+  - the visible/clickable silhouette
+  - the hover-to-expand zone
+  - the collapsed media transport zone
+
+Collapsed transport clicks are also handled at the AppKit layer through `NotchPanel.sendEvent(_:)`, so play/pause still works even when SwiftUI button delivery is flaky inside the non-activating panel.
+
 ### State Machine (`NotchViewModel`)
 
 ```
@@ -50,11 +68,20 @@ Coordinate note: `NSHostingView.isFlipped == true` (y=0 at top). The `hitTest` p
 
 `setActive(_ id:)` chains `deactivate → set id → activate` through `WidgetRegistry`.
 
+Presentation is derived separately from the expand/collapse state:
+
+- `.rest`
+- `.open`
+- `.hud`
+
+`NotchViewModel.currentMetrics` resolves the fused silhouette geometry for the current presentation mode.
+
 ### Concurrency Model
 
 - All ViewModels: `@Observable @MainActor`
 - CoreAudio / IOKit callbacks: fire on background threads — capture only value types before the block, dispatch mutations via `DispatchQueue.main.async` or `Task { @MainActor in }`
-- SwiftUI animations: single `.animation(spring, value: vm.state)` — no Timer, no manual interpolation
+- AppleScript media helpers run off-main and marshal results back through async continuations
+- SwiftUI animations: single `.animation(spring, value: vm.state)` — no manual interpolation
 
 ## Directory Structure
 
@@ -63,19 +90,23 @@ Sources/Nukku/
 ├── Animation/          NotchAnimator.swift — spring constants
 ├── App/                AppDelegate (owns all VMs), NukkuApp entry point
 ├── Preferences/        PreferencesManager (@Observable singleton), PreferencesView
-├── Services/           VolumeMonitor, BrightnessMonitor, LaunchAtLoginService, ScreenChangeService
+├── Services/           VolumeMonitor, BrightnessMonitor, BatteryMonitor,
+│                       LaunchAtLoginService, ScreenChangeService, NotificationService
 ├── Utilities/          Constants.swift, Extensions (NSScreen+Notch, Color+Theme)
 ├── ViewModels/         NotchViewModel, MediaViewModel, CalendarViewModel,
-│                       SystemMonitorViewModel, FileDropViewModel, HUDViewModel
+│                       FileDropViewModel, AppLauncherViewModel,
+│                       ShortcutsViewModel, CameraViewModel, HUDViewModel
 ├── Views/              NotchContainerView, CollapsedView, ExpandedView,
 │                       NotchShapeView, HUDView
 ├── Widgets/
 │   ├── Core/           WidgetProtocol (AnyNukkuWidgetBox), WidgetRegistry, WidgetContainer
-│   ├── Media/          MediaWidget, MediaWidgetView, MediaRemoteClient
-│   ├── Clock/          ClockWidget, ClockWidgetView
-│   ├── SystemMonitor/  SystemMonitorWidget + CPUMonitor, MemoryMonitor, NetworkMonitor
+│   ├── Media/          MediaWidget, MediaWidgetView, MediaRemoteClient,
+│   │                   AudibleProcessMonitor, BrowserTabFetcher
 │   ├── FileDrop/       FileDropWidget, FileDropWidgetView
-│   └── Calendar/       CalendarWidget, CalendarWidgetView, EventKitClient
+│   ├── Calendar/       CalendarWidget, CalendarWidgetView, EventKitClient
+│   ├── AppLauncher/    AppLauncherWidget, AppLauncherWidgetView
+│   ├── Shortcuts/      ShortcutsWidget, ShortcutsWidgetView
+│   └── Camera/         CameraWidget, CameraWidgetView
 └── Window/             NotchPanel, NotchWindowManager, TrackingHostingView (NotchHostingView)
 ```
 
@@ -87,9 +118,23 @@ Sources/Nukku/
 | `canvasHeight` | 340 | Fixed window height |
 | `collapsedWidth` | 250 | Approx MacBook notch width |
 | `collapsedHeight` | 38 (runtime) | Overwritten from `screen.safeAreaInsets.top` |
-| `expandedWidth` | 420 | Expanded panel width |
-| `expandedHeight` | 260 | Expanded panel height |
-| `hudWidth` | 320 | Width when HUD overlay is active |
+| `Geometry.rest` | `282 × 38` | Collapsed pill body-aligned content box |
+| `Geometry.openBase` | `318 × 156` | Compact open silhouette for the media-first design |
+| `Geometry.hud` | `348 × 64` | Volume / brightness / battery / notification HUD silhouette |
+| `Geometry.tension` | `0.62` | Concave melt control for the fused notch shape |
+
+## Media Detection
+
+`MediaViewModel.refresh()` resolves sources in this order:
+
+1. Spotify AppleScript path: title, artist, and player state from Spotify directly
+2. MediaRemote per-app path: title, artist, artwork, and `isPlaying` when available
+3. CoreAudio fallback: audible app icon plus browser audible-tab title via AppleScript
+
+Transport control also branches by source:
+
+- Spotify: `playpause` via AppleScript
+- other apps: `MRMediaRemoteSendCommand(.togglePlayPause)`
 
 ## Adding a Widget
 
@@ -109,10 +154,10 @@ The `activate`/`deactivate` callbacks are called automatically by `NotchViewMode
 
 See the plan file at `.claude/plans/` for the full feature checklist. Short version:
 
-**Done**: fixed-window arch, widget framework, Media/Clock/SystemMonitor/FileDrop/Calendar widgets, HUD (volume + brightness + notifications), preferences, calendar auto-refresh, F2 notification HUD, P2 visual polish (matchedGeometryEffect, Liquid Glass, squircle corners, exact notch width), security hardening.
+**Done**: fixed-window arch, fused notch silhouette, collapsed media shelves, browser/Spotify-aware media detection, AppKit transport hit-testing, HUD (volume + brightness + battery + notifications), preferences, calendar auto-refresh, app launcher / shortcuts / camera widgets, packaging + hardened runtime.
 
 **Pending**:
-- F3: camera preview widget (AVCaptureSession)
+- Title/source attribution still has edge cases for some browser audio sessions. See `.claude/todos.md`.
 
 ## Codesigning (required before distribution)
 

@@ -7,25 +7,25 @@ struct ExpandedView: View {
         let registry = WidgetRegistry.shared
         VStack(spacing: 0) {
             // ── Widget tab bar ──
-            HStack(spacing: 20) {
-                ForEach(registry.enabledWidgets, id: \.id) { widget in
-                    Button {
+            // Push below the hardware notch — `vm.collapsedHeight` is the safeAreaInsets.top
+            // read at startup so this adapts across MBP models / non-notch screens.
+            HStack(spacing: 0) {
+                ForEach(Array(registry.enabledWidgets.enumerated()), id: \.element.id) { index, widget in
+                    if index > 0 { Spacer(minLength: 0) }
+                    TabTile(
+                        widget: widget,
+                        isActive: viewModel.activeWidgetID == widget.id
+                    ) {
                         withAnimation(NotchAnimator.widgetSwitch) {
                             viewModel.setActive(widget.id)
                         }
-                    } label: {
-                        Image(systemName: widget.iconName)
-                            .font(.system(size: 14))
-                            .foregroundStyle(
-                                viewModel.activeWidgetID == widget.id ? .white : .secondary
-                            )
-                            .frame(width: 28, height: 28)
                     }
-                    .buttonStyle(.plain)
                 }
             }
-            .padding(.top, 10)
-            .padding(.bottom, 6)
+            .frame(maxWidth: .infinity)
+            .padding(.top, viewModel.collapsedHeight + 2)
+            .padding(.bottom, 7)
+            .padding(.horizontal, 18)
 
             Divider()
                 .background(Color.nukkuSeparator)
@@ -63,5 +63,31 @@ struct ExpandedView: View {
                     }
                 }
         )
+    }
+}
+
+// MARK: - Tab tile (Apple Control Center style)
+
+private struct TabTile: View {
+    let widget: AnyNukkuWidgetBox
+    let isActive: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: widget.iconName)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(isActive ? widget.accentColor : Color.nukkuInactiveTab)
+                .frame(width: 32, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.nukkuActiveTabFill)
+                        .opacity(isActive ? 1 : 0)
+                )
+                .scaleEffect(isActive ? 1.0 : 0.92)
+                .animation(.spring(response: 0.22, dampingFraction: 0.65), value: isActive)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(widget.displayName)
     }
 }

@@ -62,15 +62,18 @@ struct ShortcutsWidgetView: View {
     }
 
     private var emptyState: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             Image(systemName: "bolt.slash")
-                .font(.system(size: 24))
-                .foregroundStyle(.white.opacity(0.2))
-            Text("在快捷指令 app 里创建快捷方式\n在下方输入名称添加")
+                .font(.system(size: 26, weight: .light))
+                .foregroundStyle(.white.opacity(0.55))
+            Text("在「快捷指令」里创建快捷方式")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white.opacity(0.85))
+            Text("在下方输入名称添加")
                 .font(.system(size: 10))
-                .foregroundStyle(.white.opacity(0.3))
-                .multilineTextAlignment(.center)
+                .foregroundStyle(.white.opacity(0.55))
         }
+        .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 

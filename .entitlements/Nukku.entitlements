@@ -6,7 +6,7 @@
     <!-- Hardened Runtime: prevent DYLD_INSERT_LIBRARIES injection -->
     <key>com.apple.security.cs.allow-dyld-environment-variables</key>
     <false/>
-    <!-- Keep library validation enabled; Apple-signed private frameworks (MediaRemote) load fine -->
+    <!-- Keep library validation enabled; Apple-signed private frameworks load fine -->
     <key>com.apple.security.cs.disable-library-validation</key>
     <false/>
     <!-- FileDrop widget: read and reveal user-selected files -->
@@ -18,5 +18,19 @@
     <!-- Camera widget: AVCaptureSession access -->
     <key>com.apple.security.device.camera</key>
     <true/>
+    <!-- Media widget: browser tab title fetch via AppleEvents -->
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+    <!-- Browser bundle IDs whitelisted for AppleEvents (browser tab title fetch). -->
+    <key>com.apple.security.temporary-exception.apple-events</key>
+    <array>
+        <string>com.google.Chrome</string>
+        <string>company.thebrowser.Browser</string>
+        <string>company.thebrowser.dia</string>
+        <string>com.brave.Browser</string>
+        <string>com.microsoft.edgemac</string>
+        <string>com.vivaldi.Vivaldi</string>
+        <string>com.apple.Safari</string>
+    </array>
 </dict>
 </plist>

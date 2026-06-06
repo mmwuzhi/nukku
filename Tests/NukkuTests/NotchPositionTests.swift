@@ -7,7 +7,6 @@ struct WidgetRegistryTests {
     @MainActor
     func defaultWidgetCount() async {
         let mediaVM       = MediaViewModel()
-        let systemVM      = SystemMonitorViewModel()
         let calVM         = CalendarViewModel()
         let fileVM        = FileDropViewModel()
         let launcherVM    = AppLauncherViewModel()
@@ -15,19 +14,18 @@ struct WidgetRegistryTests {
         let cameraVM      = CameraViewModel()
         let registry      = WidgetRegistry.shared
         registry.registerDefaults(
-            mediaVM: mediaVM, systemVM: systemVM,
+            mediaVM: mediaVM,
             calendarVM: calVM, fileDropVM: fileVM,
             appLauncherVM: launcherVM, shortcutsVM: shortcutsVM,
             cameraVM: cameraVM
         )
-        #expect(registry.widgets.count == 8)
+        #expect(registry.widgets.count == 6)
     }
 
     @Test("All default widgets enabled")
     @MainActor
     func allEnabledByDefault() async {
         let mediaVM       = MediaViewModel()
-        let systemVM      = SystemMonitorViewModel()
         let calVM         = CalendarViewModel()
         let fileVM        = FileDropViewModel()
         let launcherVM    = AppLauncherViewModel()
@@ -35,7 +33,7 @@ struct WidgetRegistryTests {
         let cameraVM      = CameraViewModel()
         let registry      = WidgetRegistry.shared
         registry.registerDefaults(
-            mediaVM: mediaVM, systemVM: systemVM,
+            mediaVM: mediaVM,
             calendarVM: calVM, fileDropVM: fileVM,
             appLauncherVM: launcherVM, shortcutsVM: shortcutsVM,
             cameraVM: cameraVM
@@ -63,12 +61,33 @@ struct NotchViewModelTests {
         #expect(vm.isExpanded)
     }
 
-    @Test("targetInteractiveSize matches state")
+    @Test("targetInteractiveSize reflects fused metrics by state")
     @MainActor
     func targetSizeMatchesState() {
         let vm = NotchViewModel()
-        #expect(vm.targetInteractiveSize.width == Constants.Notch.collapsedWidth)
+        // Rest metrics: topWidth 300, bodyWidth 286 → bounding width 300.
+        #expect(vm.targetInteractiveSize.width == max(
+            Constants.Geometry.rest.topWidth,
+            Constants.Geometry.rest.bodyWidth
+        ))
+        #expect(vm.targetInteractiveSize.height == Constants.Geometry.rest.height)
         vm.expand()
-        #expect(vm.targetInteractiveSize.width == Constants.Notch.expandedWidth)
+        // Open metrics: topWidth 318, bodyWidth 300 → bounding width 318.
+        #expect(vm.targetInteractiveSize.width == max(
+            Constants.Geometry.openBase.topWidth,
+            Constants.Geometry.openBase.bodyWidth
+        ))
+        #expect(vm.targetInteractiveSize.height == Constants.Geometry.openBase.height)
+
+        let hudVM = HUDViewModel()
+        vm.hudViewModel = hudVM
+        vm.forceCollapse()
+        hudVM.show(.volume(level: 0.5, muted: false))
+        #expect(vm.presentationMode == .hud)
+        #expect(vm.targetInteractiveSize.width == max(
+            Constants.Geometry.hud.topWidth,
+            Constants.Geometry.hud.bodyWidth
+        ))
+        #expect(vm.targetInteractiveSize.height == Constants.Geometry.hud.height)
     }
 }

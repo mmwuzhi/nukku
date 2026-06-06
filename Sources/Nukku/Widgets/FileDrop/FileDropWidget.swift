@@ -6,7 +6,9 @@ enum FileDropWidget {
         makeWidgetBox(
             id: "filedrop",
             displayName: "文件",
-            iconName: "tray"
+            iconName: "tray",
+            accentColor: .blue,
+            preferredSize: CGSize(width: 280, height: 100)
         ) {
             FileDropWidgetView()
                 .environment(viewModel)

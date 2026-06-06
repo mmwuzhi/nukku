@@ -5,7 +5,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // ViewModels — owned here, injected into window & registry
     let notchVM         = NotchViewModel()
     let mediaVM         = MediaViewModel()
-    let systemVM        = SystemMonitorViewModel()
     let calendarVM      = CalendarViewModel()
     let fileDropVM      = FileDropViewModel()
     let hudVM           = HUDViewModel()
@@ -21,10 +20,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
 
+        // Cross-wire VMs:
+        //  - NotchViewModel needs to read HUD state so its `currentMetrics`
+        //    resolves to the right fused-shape dimensions for HUD / tap.
+        //  - MediaViewModel needs to fire transport-tap HUD pulses.
+        notchVM.hudViewModel = hudVM
+        mediaVM.hudViewModel = hudVM
+
         // Register widgets with shared registry
         WidgetRegistry.shared.registerDefaults(
             mediaVM:       mediaVM,
-            systemVM:      systemVM,
             calendarVM:    calendarVM,
             fileDropVM:    fileDropVM,
             appLauncherVM: appLauncherVM,

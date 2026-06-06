@@ -22,10 +22,10 @@ struct CameraWidgetView: View {
         VStack(spacing: 10) {
             Image(systemName: "camera.fill")
                 .font(.system(size: 28))
-                .foregroundStyle(.white.opacity(0.3))
+                .foregroundStyle(.white.opacity(0.55))
             Text("摄像头权限已拒绝")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(.white.opacity(0.85))
             Button("在系统设置中开启") {
                 NSWorkspace.shared.open(
                     URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!

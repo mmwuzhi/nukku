@@ -81,6 +81,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <string>Nukku displays upcoming events in the notch calendar widget.</string>
     <key>NSCameraUsageDescription</key>
     <string>Nukku shows a live camera preview in the notch camera widget.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Nukku reads the current tab title from your browser to show what's playing.</string>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © 2026 Nukku.</string>
 </dict>

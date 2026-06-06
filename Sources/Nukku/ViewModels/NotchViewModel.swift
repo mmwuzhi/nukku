@@ -6,6 +6,12 @@ enum NotchState: Equatable {
     case expanded
 }
 
+enum NotchPresentationMode: Equatable {
+    case rest
+    case open
+    case hud
+}
+
 @Observable
 @MainActor
 final class NotchViewModel {
@@ -18,20 +24,60 @@ final class NotchViewModel {
 
     var isExpanded: Bool { state == .expanded }
 
-    // Rect for hitTest in hosting-view coordinates (y-down, origin top-left)
+    /// HUD view-model is set externally so `currentMetrics` can resolve HUD
+    /// dimensions. Weak so neither side owns the other.
+    @ObservationIgnored
+    weak var hudViewModel: HUDViewModel?
+
+    /// Expanded panel height. Media follows Claude Design's compact open model;
+    /// other widgets keep enough vertical room for their preferred content.
+    var targetExpandedHeight: CGFloat {
+        if activeWidgetID == "media" {
+            return Constants.Geometry.openBase.height
+        }
+        let chrome: CGFloat = collapsedHeight + 65
+        if let id = activeWidgetID,
+           let widget = WidgetRegistry.shared.widgets.first(where: { $0.id == id }) {
+            return max(Constants.Geometry.openBase.height, chrome + widget.preferredSize.height)
+        }
+        return Constants.Geometry.openBase.height
+    }
+
+    /// Single presentation state for both shape and content. Normal HUDs own
+    /// the surface when collapsed, otherwise the notch state decides rest/open.
+    var presentationMode: NotchPresentationMode {
+        if hudViewModel?.currentHUD != nil && !isExpanded { return .hud }
+        return isExpanded ? .open : .rest
+    }
+
+    /// Fused-shape metrics for the current presentation mode. Single source of
+    /// truth for SwiftUI rendering and AppKit hover/click gating.
+    var currentMetrics: Constants.Geometry.StateMetrics {
+        switch presentationMode {
+        case .rest: return Constants.Geometry.rest
+        case .open: return Constants.Geometry.open(height: targetExpandedHeight)
+        case .hud:  return Constants.Geometry.hud
+        }
+    }
+
+    // Bounding rect for hitTest in hosting-view coordinates (y-down, origin top-left).
+    // The visible silhouette is `topWidth` wide at y=0 and `bodyWidth` below the
+    // melt cove — `topWidth` is the bounding width.
     var targetInteractiveSize: CGSize {
-        isExpanded
-            ? CGSize(width: Constants.Notch.expandedWidth, height: Constants.Notch.expandedHeight)
-            : CGSize(width: collapsedWidth, height: collapsedHeight)
+        let m = currentMetrics
+        return CGSize(width: max(m.topWidth, m.bodyWidth), height: m.height)
     }
 
     private var collapseTask: Task<Void, Never>?
+    private var hoverEnterTask: Task<Void, Never>?
 
     // MARK: - Expand / Collapse
 
     func expand() {
         collapseTask?.cancel()
         collapseTask = nil
+        hoverEnterTask?.cancel()
+        hoverEnterTask = nil
         if activeWidgetID == nil {
             activeWidgetID = WidgetRegistry.shared.enabledWidgets.first?.id
         }
@@ -39,8 +85,26 @@ final class NotchViewModel {
         state = .expanded
     }
 
+    /// Schedule expand after a short dwell — masks accidental cursor crossings.
+    /// Called from hover-enter; balanced by cancelHoverEnter on hover-exit.
+    func scheduleHoverExpand() {
+        hoverEnterTask?.cancel()
+        hoverEnterTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(Constants.Notch.hoverDwellSeconds))
+            guard !Task.isCancelled else { return }
+            self?.expand()
+        }
+    }
+
+    func cancelHoverExpand() {
+        hoverEnterTask?.cancel()
+        hoverEnterTask = nil
+    }
+
     /// Delayed collapse — respects user's collapseDelay preference.
     func collapse() {
+        hoverEnterTask?.cancel()
+        hoverEnterTask = nil
         collapseTask?.cancel()
         let delay = PreferencesManager.shared.collapseDelay
         collapseTask = Task {
@@ -55,6 +119,8 @@ final class NotchViewModel {
     func forceCollapse() {
         collapseTask?.cancel()
         collapseTask = nil
+        hoverEnterTask?.cancel()
+        hoverEnterTask = nil
         deactivateCurrentWidget()
         state = .collapsed
     }

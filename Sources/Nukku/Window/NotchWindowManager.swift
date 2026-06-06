@@ -9,6 +9,15 @@ final class NotchWindowManager {
     private let hudViewModel: HUDViewModel
     private let hotkeyService = HotkeyService()
 
+    // Cursor tracking for hover detection + click-through gating. A global
+    // mouse-move monitor starts a 15 Hz poller only while the pointer is near
+    // the top-center screen band.
+    private var mouseTimer: Timer?
+    private var mouseMoveMonitor: Any?
+    private var mouseDownMonitor: Any?
+    private var isCursorInHoverZone: Bool = false
+    private var isMouseTrackingActive: Bool = false
+
     init(notchViewModel: NotchViewModel, mediaViewModel: MediaViewModel, hudViewModel: HUDViewModel) {
         self.notchViewModel = notchViewModel
         self.mediaViewModel = mediaViewModel
@@ -64,13 +73,13 @@ final class NotchWindowManager {
         hostingView.autoresizingMask = [.width, .height]
         panel.contentView = hostingView
 
-        // Provide hitTest rect (view-local coords, y-down)
+        // Click hit-test rect (view-local, y-down) — matches the full visible silhouette so
+        // any click on the notch passes through to SwiftUI.
         let capturedHUDVM = hudViewModel
         hostingView.interactiveRect = { [weak notchVM] in
             guard let vm = notchVM else { return .zero }
-            // When a HUD is active the visible notch is hudWidth wide — match the hit zone.
-            let isHUDActive = !vm.isExpanded && capturedHUDVM.currentHUD != nil
-            let width: CGFloat = isHUDActive ? Constants.Notch.hudWidth : vm.targetInteractiveSize.width
+            _ = capturedHUDVM // keep HUD VM captured so updates invalidate closure dependencies
+            let width: CGFloat = vm.targetInteractiveSize.width
             let height: CGFloat = vm.targetInteractiveSize.height
             let midX = Constants.Notch.canvasWidth / 2
             return CGRect(x: midX - width / 2, y: 0, width: width, height: height)
@@ -81,13 +90,199 @@ final class NotchWindowManager {
         hostingView.layer?.isOpaque = false
 
         self.panel = panel
+        panel.ignoresMouseEvents = true   // start in pass-through mode; toggled by mouse monitor
         panel.orderFrontRegardless()
+
+        startMouseMonitor()
 
         // Start global hotkey (checks enabled flag on each keypress)
         hotkeyService.start { [weak self] in
             guard let vm = self?.notchViewModel else { return }
             if vm.isExpanded { vm.forceCollapse() } else { vm.expand() }
         }
+    }
+
+    // MARK: - Mouse monitor (hover + click-through gating)
+    //
+    // SwiftUI .onHover uses the view frame (whole 700×340 canvas) and can't be narrowed
+    // by .contentShape. NSHostingView's internal tracking covers the whole hosting view.
+    // To get a tight hover zone AND let clicks pass through to menu-bar items adjacent
+    // to the notch, the app samples NSEvent.mouseLocation at 15 Hz only while the pointer
+    // is near the top-center screen band.
+    //
+    //  - cursor inside interactiveZone() → panel ignoresMouseEvents = false (panel can be clicked)
+    //  - cursor inside expandZone()      → schedule expand
+    //  - cursor outside expandZone()     → cancel expand / start collapse
+    //
+    // The two zones intentionally differ in collapsed media state: the right
+    // shelf is a transport control, so it remains clickable without becoming
+    // an accidental hover-to-expand trigger.
+
+    private func startMouseMonitor() {
+        mouseMoveMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
+            Task { @MainActor in self?.updateMouseTrackingActivation() }
+        }
+        mouseDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
+            Task { @MainActor in self?.handleGlobalMouseDown() }
+        }
+
+        panel?.handleLeftMouseDownInScreen = { [weak self] point in
+            guard let self else { return false }
+            return self.handlePanelLeftMouseDown(at: point)
+        }
+    }
+
+    private func stopMouseMonitor() {
+        mouseTimer?.invalidate()
+        mouseTimer = nil
+        if let mouseMoveMonitor {
+            NSEvent.removeMonitor(mouseMoveMonitor)
+            self.mouseMoveMonitor = nil
+        }
+        if let mouseDownMonitor {
+            NSEvent.removeMonitor(mouseDownMonitor)
+            self.mouseDownMonitor = nil
+        }
+        isMouseTrackingActive = false
+    }
+
+    private func startTopRegionPollingIfNeeded() {
+        guard mouseTimer == nil else { return }
+        let timer = Timer(timeInterval: 1.0 / 15.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.handleMouseMove() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        mouseTimer = timer
+        isMouseTrackingActive = true
+        handleMouseMove()
+    }
+
+    private func stopTopRegionPolling() {
+        mouseTimer?.invalidate()
+        mouseTimer = nil
+        isMouseTrackingActive = false
+        isCursorInHoverZone = false
+        mediaViewModel.isHoveringTransportControl = false
+        notchViewModel?.cancelHoverExpand()
+        notchViewModel?.collapse()
+        panel?.ignoresMouseEvents = true
+    }
+
+    private func updateMouseTrackingActivation() {
+        let cursor = NSEvent.mouseLocation
+        if isNearTopRegion(cursor) {
+            startTopRegionPollingIfNeeded()
+        } else if isMouseTrackingActive {
+            stopTopRegionPolling()
+        }
+    }
+
+    private func isNearTopRegion(_ cursor: CGPoint) -> Bool {
+        guard let screen = primaryScreen(), abs(cursor.x - screen.frame.midX) <= Constants.Notch.canvasWidth / 2 else {
+            return false
+        }
+        let activeHeight = currentInteractiveZoneScreenRect().height + 42
+        let topBandHeight = (isMouseTrackingActive || notchViewModel?.isExpanded == true)
+            ? max(90, activeHeight)
+            : 90
+        return cursor.y >= screen.frame.maxY - topBandHeight
+    }
+
+    /// Returns the visible/clickable zone in *screen* coordinates (bottom-origin).
+    /// Tracks the current silhouette so adjacent menu-bar items remain clickable.
+    private func currentInteractiveZoneScreenRect() -> CGRect {
+        guard let panel, let vm = notchViewModel else { return .zero }
+        let metrics = vm.currentMetrics
+        let baseWidth = max(metrics.topWidth, metrics.bodyWidth)
+        let baseHeight = metrics.height
+        let xInset: CGFloat
+        if vm.isExpanded {
+            xInset     = 0
+        } else if hudViewModel.currentHUD != nil {
+            xInset     = 0
+        } else {
+            xInset     = 6
+        }
+
+        let width  = max(0, baseWidth - xInset * 2)
+        // Extend top by 2pt so cursor at the very top edge of the screen still counts
+        // (CGRect.contains uses [y, y+height) and would otherwise exclude the upper edge).
+        let topPad: CGFloat = 2
+        let panelFrame = panel.frame
+        return CGRect(
+            x: panelFrame.midX - width / 2,
+            y: panelFrame.maxY - baseHeight,
+            width:  width,
+            height: baseHeight + topPad
+        )
+    }
+
+    /// Returns the hover-to-expand trigger zone. It is usually the same as the
+    /// clickable zone, except collapsed media controls exclude the right shelf
+    /// so aiming for play/pause does not open the panel.
+    private func currentExpandZoneScreenRect() -> CGRect {
+        guard let vm = notchViewModel else { return .zero }
+        var rect = currentInteractiveZoneScreenRect()
+        guard vm.presentationMode == .rest, mediaViewModel.hasMediaSession else {
+            return rect
+        }
+        let rightControlWidth: CGFloat = 58
+        rect.size.width = max(0, rect.width - rightControlWidth)
+        return rect
+    }
+
+    private func currentTransportControlZoneScreenRect() -> CGRect {
+        guard let vm = notchViewModel,
+              vm.presentationMode == .rest,
+              mediaViewModel.hasMediaSession else {
+            return .zero
+        }
+        let interactive = currentInteractiveZoneScreenRect()
+        let rightControlWidth: CGFloat = 58
+        return CGRect(
+            x: interactive.maxX - rightControlWidth,
+            y: interactive.minY,
+            width: rightControlWidth,
+            height: interactive.height
+        )
+    }
+
+    private func handleMouseMove() {
+        guard let panel, let vm = notchViewModel else { return }
+        let cursor = NSEvent.mouseLocation  // screen coords, bottom-origin
+        guard isNearTopRegion(cursor) else {
+            stopTopRegionPolling()
+            return
+        }
+        let insideInteractiveZone = currentInteractiveZoneScreenRect().contains(cursor)
+        let insideExpandZone = currentExpandZoneScreenRect().contains(cursor)
+        let insideTransportControl = currentTransportControlZoneScreenRect().contains(cursor)
+        // Always update panel.ignoresMouseEvents for click-through behavior.
+        panel.ignoresMouseEvents = !insideInteractiveZone
+        mediaViewModel.isHoveringTransportControl = insideTransportControl
+
+        guard insideExpandZone != isCursorInHoverZone else { return }
+        isCursorInHoverZone = insideExpandZone
+        if insideExpandZone {
+            vm.scheduleHoverExpand()
+        } else {
+            vm.cancelHoverExpand()
+            vm.collapse()
+        }
+    }
+
+    private func handlePanelLeftMouseDown(at point: CGPoint) -> Bool {
+        guard currentTransportControlZoneScreenRect().contains(point) else { return false }
+        mediaViewModel.togglePlayPause()
+        handleMouseMove()
+        return true
+    }
+
+    private func handleGlobalMouseDown() {
+        let cursor = NSEvent.mouseLocation
+        guard currentTransportControlZoneScreenRect().contains(cursor) else { return }
+        mediaViewModel.togglePlayPause()
+        handleMouseMove()
     }
 
     // MARK: - Reposition (screen change only, no animation)
@@ -106,6 +301,8 @@ final class NotchWindowManager {
 
     func teardown() {
         hotkeyService.stop()
+        stopMouseMonitor()
+        panel?.handleLeftMouseDownInScreen = nil
         panel?.close()
         panel = nil
     }

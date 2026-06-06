@@ -12,17 +12,12 @@ struct NotchContainerView: View {
     private var expandTrigger: ExpandTrigger { ExpandTrigger(rawValue: expandTriggerRaw) ?? .hover }
 
     // ── Geometry derived from state ──
-    private var isHUDActive: Bool { !vm.isExpanded && hudVM.currentHUD != nil }
+    private var currentMetrics: Constants.Geometry.StateMetrics { vm.currentMetrics }
+    private var presentationMode: NotchPresentationMode { vm.presentationMode }
     private var targetWidth: CGFloat {
-        if isHUDActive { return Constants.Notch.hudWidth }
-        return vm.isExpanded ? Constants.Notch.expandedWidth : vm.collapsedWidth
+        max(currentMetrics.topWidth, currentMetrics.bodyWidth)
     }
-    private var targetHeight: CGFloat {
-        vm.isExpanded ? Constants.Notch.expandedHeight : vm.collapsedHeight
-    }
-    private var bottomRadius: CGFloat {
-        vm.isExpanded ? Constants.Notch.cornerRadiusExpanded : Constants.Notch.cornerRadiusCollapsed
-    }
+    private var targetHeight: CGFloat { currentMetrics.height }
     private var shapeSpring: Animation {
         vm.isExpanded ? NotchAnimator.expand : NotchAnimator.collapse
     }
@@ -30,78 +25,77 @@ struct NotchContainerView: View {
     var body: some View {
         ZStack(alignment: .top) {
 
-            // ── 1. Notch silhouette ──
+            // ── 1. Fused notch silhouette ──
+            // Opaque black in every state. Matching the physical camera cutout exactly is
+            // what creates the "one solid Dynamic Island" illusion; glass/sheen breaks it.
             currentShape
                 .fill(Color.black)
                 .shadow(
                     color: .black.opacity(vm.isExpanded ? 0.30 : 0),
-                    radius: 16, y: 8
+                    radius: 14, y: 8
                 )
                 .animation(shapeSpring, value: vm.state)
-                .animation(NotchAnimator.hudTransition, value: isHUDActive)
-
-            // ── 1b. Liquid Glass layer (macOS 26, visible when expanded) ──
-            Color.clear
-                .frame(width: targetWidth, height: targetHeight)
-                .glassEffect(.regular)
-                .clipShape(currentShape)
-                .opacity(vm.isExpanded ? 1 : 0)
-                .animation(shapeSpring, value: vm.state)
-                .animation(NotchAnimator.hudTransition, value: isHUDActive)
+                .animation(shapeSpring, value: vm.activeWidgetID)
+                .animation(NotchAnimator.hudTransition, value: hudVM.currentHUD)
 
             // ── 2. Content layer ──
             ZStack {
-                // HUD overlay (collapsed only)
-                if let hud = hudVM.currentHUD, !vm.isExpanded {
-                    HUDView(hud: hud)
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                switch presentationMode {
+                case .rest:
+                    CollapsedView()
+                        .environment(mediaVM)
+                        .transition(.opacity)
+
+                case .hud:
+                    if let hud = visibleHUD {
+                        HUDView(hud: hud)
+                            .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                    }
+
+                case .open:
+                    ExpandedView()
+                        .transition(.opacity)
                 }
-
-                // Collapsed media/clock content
-                CollapsedView()
-                    .environment(mediaVM)
-                    .opacity(vm.isExpanded || isHUDActive ? 0 : 1)
-                    // Two separate animation drivers: one for expand/collapse, one for HUD crossfade
-                    .animation(
-                        vm.isExpanded ? NotchAnimator.contentHide : NotchAnimator.contentReveal.delay(0.15),
-                        value: vm.state
-                    )
-                    .animation(NotchAnimator.contentHide, value: isHUDActive)
-
-                // Expanded panel content
-                ExpandedView()
-                    .opacity(vm.isExpanded ? 1 : 0)
-                    .animation(
-                        vm.isExpanded
-                            ? NotchAnimator.contentReveal.delay(0.08)
-                            : NotchAnimator.contentHide,
-                        value: vm.state
-                    )
             }
             .frame(width: targetWidth, height: targetHeight)
             .clipShape(currentShape)
             .environment(\.notchNamespace, notchNS)
+            .animation(
+                presentationMode == .open
+                    ? NotchAnimator.contentReveal.delay(0.08)
+                    : NotchAnimator.contentHide,
+                value: presentationMode
+            )
             .animation(shapeSpring, value: vm.state)
-            .animation(NotchAnimator.hudTransition, value: isHUDActive)
+            .animation(shapeSpring, value: vm.activeWidgetID)
+            .animation(NotchAnimator.hudTransition, value: hudVM.currentHUD)
         }
         .frame(
             width:  Constants.Notch.canvasWidth,
             height: Constants.Notch.canvasHeight,
             alignment: .top
         )
+        // The actual hover hit gate lives in NotchHostingView (AppKit hitTest with
+        // interactiveRect provided by NotchWindowManager). contentShape only narrows
+        // click hit-testing inside the visible silhouette.
         .contentShape(currentShape)
-        // Pass expandTrigger as a value so the modifier re-evaluates when the user changes it
         .modifier(NotchInteractionModifier(vm: vm, trigger: expandTrigger))
-        .animation(NotchAnimator.hudTransition, value: hudVM.currentHUD != nil)
+        .animation(NotchAnimator.hudTransition, value: hudVM.currentHUD)
     }
 
     private var currentShape: NotchShape {
         NotchShape(
-            width:        targetWidth,
-            height:       targetHeight,
-            topRadius:    Constants.Notch.outerCornerRadius,
-            bottomRadius: bottomRadius
+            topWidth:     currentMetrics.topWidth,
+            bodyWidth:    currentMetrics.bodyWidth,
+            height:       currentMetrics.height,
+            coveHeight:   currentMetrics.coveHeight,
+            bottomRadius: currentMetrics.bottomRadius,
+            tension:      Constants.Geometry.tension
         )
+    }
+
+    private var visibleHUD: HUDType? {
+        hudVM.currentHUD
     }
 }
 
@@ -112,16 +106,16 @@ private struct NotchInteractionModifier: ViewModifier {
     let trigger: ExpandTrigger  // value type — parent re-creates modifier when setting changes
 
     func body(content: Content) -> some View {
-        if trigger == .hover {
-            content
-                .onHover { hovering in
-                    if hovering { vm.expand() } else { vm.collapse() }
-                }
-        } else {
+        // Hover is driven by NSTrackingArea inside NotchHostingView — see TrackingHostingView.swift.
+        // SwiftUI .onHover is not used because it uses the view's frame (whole canvas) and
+        // can't be narrowed by .contentShape.
+        if trigger == .click {
             content
                 .onTapGesture {
                     if vm.isExpanded { vm.forceCollapse() } else { vm.expand() }
                 }
+        } else {
+            content
         }
     }
 }

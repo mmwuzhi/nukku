@@ -6,7 +6,9 @@ enum ShortcutsWidget {
         makeWidgetBox(
             id: "shortcuts",
             displayName: "快捷指令",
-            iconName: "bolt.fill"
+            iconName: "bolt.fill",
+            accentColor: .purple,
+            preferredSize: CGSize(width: 280, height: 140)
         ) {
             ShortcutsWidgetView()
                 .environment(viewModel)

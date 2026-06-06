@@ -23,7 +23,7 @@ enum HUDType: @unchecked Sendable {
             case 0.10...: return "battery.25"
             default:      return "battery.0"
             }
-        case .notification:         return "bell.fill"
+        case .notification: return "bell.fill"
         }
     }
 
@@ -36,15 +36,26 @@ enum HUDType: @unchecked Sendable {
         }
     }
 
-    // Percentage label shown next to the progress bar (battery only).
+    // Percentage label shown next to the progress bar. Shown for volume/brightness/battery
+    // so user can see numeric level — for notifications there is none (uses notification layout).
     var percentLabel: String? {
-        if case .battery(let l, _) = self { return "\(Int(l * 100))%" }
-        return nil
+        switch self {
+        case .volume(let l, let muted):
+            return muted ? "Muted" : "\(Int((l * 100).rounded()))"
+        case .brightness(let l):
+            return "\(Int((l * 100).rounded()))"
+        case .battery(let l, _):
+            return "\(Int((l * 100).rounded()))%"
+        case .notification:
+            return nil
+        }
     }
 
     var dismissDuration: Double {
-        if case .notification = self { return 3.0 }
-        return 1.5
+        switch self {
+        case .notification:  return 3.0
+        default:             return 1.5
+        }
     }
 
     var isNotification: Bool {

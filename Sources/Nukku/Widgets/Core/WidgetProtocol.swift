@@ -8,6 +8,7 @@ final class AnyNukkuWidgetBox: Identifiable {
     let id: String
     let displayName: String
     let iconName: String
+    let accentColor: Color
     let preferredSize: CGSize
     var isEnabled: Bool
 
@@ -19,6 +20,7 @@ final class AnyNukkuWidgetBox: Identifiable {
         id: String,
         displayName: String,
         iconName: String,
+        accentColor: Color,
         preferredSize: CGSize,
         isEnabled: Bool,
         makeBody: @escaping @MainActor () -> AnyView,
@@ -28,6 +30,7 @@ final class AnyNukkuWidgetBox: Identifiable {
         self.id = id
         self.displayName = displayName
         self.iconName = iconName
+        self.accentColor = accentColor
         self.preferredSize = preferredSize
         self.isEnabled = isEnabled
         self._makeBody = makeBody
@@ -47,6 +50,7 @@ func makeWidgetBox<V: View>(
     id: String,
     displayName: String,
     iconName: String,
+    accentColor: Color,
     preferredSize: CGSize = CGSize(width: 360, height: 180),
     isEnabled: Bool = true,
     activate: @escaping @MainActor () -> Void = {},
@@ -57,10 +61,10 @@ func makeWidgetBox<V: View>(
         id: id,
         displayName: displayName,
         iconName: iconName,
+        accentColor: accentColor,
         preferredSize: preferredSize,
         isEnabled: isEnabled,
         makeBody: { AnyView(body()) },
         activate: activate,
         deactivate: deactivate
-    )
-}
+    )}
