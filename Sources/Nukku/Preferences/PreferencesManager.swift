@@ -69,6 +69,13 @@ final class PreferencesManager {
         set { hotkeyPresetRaw = newValue.rawValue }
     }
 
+    @ObservationIgnored
+    @AppStorage("showMediaDiagnostics") private var showMediaDiagnosticsRaw: Bool = false
+    var showMediaDiagnostics: Bool {
+        get { showMediaDiagnosticsRaw }
+        set { showMediaDiagnosticsRaw = newValue }
+    }
+
     func hotkeyComponents() -> (NSEvent.ModifierFlags, UInt16) {
         hotkeyPreset.components
     }

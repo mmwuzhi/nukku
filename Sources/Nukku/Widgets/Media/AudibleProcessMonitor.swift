@@ -25,17 +25,27 @@ final class AudibleProcessMonitor {
     func currentlyAudible() -> AudibleApp? {
         guard let audioObjects = audioProcessObjectIDs() else { return nil }
         for id in audioObjects {
-            guard isRunning(id) else { continue }
+            guard isRunningOutput(id) else { continue }
             guard let pid = pid(for: id), pid > 0 else { continue }
             guard let bundleID = bundleID(for: id), !bundleID.isEmpty else { continue }
             if isSystemBundle(bundleID) { continue }
 
             // Map known helper bundles to their parent browser.
             if let parent = resolveParentBrowser(forBundle: bundleID) {
+                if PreferencesManager.shared.showMediaDiagnostics {
+                    MediaDiagnosticsLogger.write(
+                        "[CA] object=\(id) helperBundle=\(bundleID) parentBundle=\(parent.bundleID) parentPID=\(parent.pid)"
+                    )
+                }
                 return parent
             }
 
             guard let runningApp = NSRunningApplication(processIdentifier: pid) else { continue }
+            if PreferencesManager.shared.showMediaDiagnostics {
+                MediaDiagnosticsLogger.write(
+                    "[CA] object=\(id) bundle=\(bundleID) pid=\(pid) app=\(runningApp.localizedName ?? bundleID)"
+                )
+            }
             return AudibleApp(
                 pid: pid,
                 bundleID: bundleID,
@@ -111,9 +121,12 @@ final class AudibleProcessMonitor {
         return pid
     }
 
-    private func isRunning(_ id: AudioObjectID) -> Bool {
+    /// `IsRunning` is too broad for playback detection because it stays true
+    /// while a process has audio IO in progress even without an active output
+    /// stream. For media presence we only want processes with live output.
+    private func isRunningOutput(_ id: AudioObjectID) -> Bool {
         var addr = AudioObjectPropertyAddress(
-            mSelector: kAudioProcessPropertyIsRunning,
+            mSelector: kAudioProcessPropertyIsRunningOutput,
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )

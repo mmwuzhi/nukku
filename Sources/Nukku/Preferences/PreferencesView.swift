@@ -65,6 +65,12 @@ struct PreferencesView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            Section("诊断") {
+                Toggle("显示媒体诊断", isOn: $prefs.showMediaDiagnostics)
+                Text("在媒体 widget 中显示来源、状态和补全信息，并输出诊断日志")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .padding()

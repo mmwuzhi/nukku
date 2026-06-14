@@ -1,92 +1,106 @@
 import AppKit
+import Foundation
 import Observation
 
 @Observable
 @MainActor
 final class MediaViewModel {
-    /// Temporary diagnostic indicator surfaced in the widget UI.
-    /// Tells us which detection path produced the currently-displayed data.
     enum DataSource: String {
-        case mediaRemote      = "M"   // MR per-app — richest data
-        case coreAudioWithTab = "A"   // CoreAudio + Chromium AppleScript tab title
-        case coreAudioOnly    = "C"   // CoreAudio app name only
+        case mediaRemote = "M"
+        case browserMedia = "B"
+        case coreAudioOnly = "C"
     }
 
     var nowPlayingTitle: String?
     var nowPlayingArtist: String?
     var albumArtwork: NSImage?
-    var isPlaying: Bool = false
+    private(set) var displayPlaybackState: PlaybackState = .stopped
+    private(set) var validatedPlaybackState: PlaybackState = .stopped
+    private(set) var reportedPlaybackState: PlaybackState = .stopped
     var sourceAppName: String?
     var sourceBundleID: String?
     var dataSource: DataSource?
     var isHoveringTransportControl: Bool = false
+    var debugSourceSummary: String?
+    var debugClientBundleID: String?
+    var debugRawKeysSummary: String?
+    var didUseBrowserSupplement: Bool = false
+    var debugPlaybackRate: Double?
+
+    var playbackState: PlaybackState {
+        displayPlaybackState
+    }
+
+    var isPlaying: Bool {
+        displayPlaybackState.isPlaying
+    }
 
     var hasMediaSession: Bool {
-        nowPlayingTitle != nil || sourceBundleID != nil || albumArtwork != nil
+        displayKind != .empty
+    }
+
+    var displayKind: MediaDisplayKind {
+        currentSession?.displayKind ?? .empty
     }
 
     var elapsedTime: Double = 0
     var duration: Double = 0
     var progress: Double { duration > 0 ? min(elapsedTime / duration, 1.0) : 0 }
 
-    private let mr = MediaRemoteClient.shared
-    private var observerTokens: [NSObjectProtocol] = []
+    private let browserMediaSessionProvider = BrowserMediaSessionProvider.shared
     private var pollTask: Task<Void, Never>?
     private var progressTask: Task<Void, Never>?
+    private var burstTask: Task<Void, Never>?
+    private var currentSession: MediaSessionSnapshot?
 
     @ObservationIgnored
     weak var hudViewModel: HUDViewModel?
 
-    /// After a user-initiated transport toggle, ignore external `isPlaying`
-    /// updates for this long. Prevents CoreAudio's lagging "is running" flag
-    /// (audio tail can take ~1s to drop) and stray MR notifications from
-    /// reverting the optimistic UI change.
     @ObservationIgnored
-    private var ignoreIsPlayingUntil: Date = .distantPast
+    private var ignoreExternalStateUntil: Date = .distantPast
 
-    /// Bumped whenever the displayed title should re-surface from the start —
-    /// on a true track change or a user-initiated play/pause toggle. The Media
-    /// widget's MarqueeText keys its scroll task on this token so the title
-    /// jumps back to the start whenever something noteworthy happened, even
-    /// if the user wasn't looking (Alcove-style "hey, the song changed" beat).
     private(set) var marqueeRestartToken: Int = 0
 
     @ObservationIgnored
     private var previousTitle: String?
 
+    @ObservationIgnored
+    private var lastPlaybackSample: MediaPlaybackSample?
+
+    private let burstRefreshInterval: Duration = .milliseconds(140)
+    private let burstRefreshCount: Int = 2
+    private let optimisticGuardWindow: TimeInterval = 0.4
+    private let defaultPollInterval: Duration = .seconds(2)
+    private let fallbackPollInterval: Duration = .milliseconds(250)
+
     init() {
-        setupObservers()
+        if PreferencesManager.shared.showMediaDiagnostics {
+            MediaDiagnosticsLogger.reset()
+        }
         startPolling()
     }
 
-    isolated deinit {
-        observerTokens.forEach { NotificationCenter.default.removeObserver($0) }
+    /// Starts the system now-playing listener and routes its push events into `refresh()`.
+    /// Called explicitly from `AppDelegate` (not `init`) so unit tests can construct the
+    /// view model without spawning the perl subprocess.
+    func startSystemNowPlaying() {
+        SystemNowPlayingClient.shared.onUpdate = { [weak self] in
+            Task { @MainActor in await self?.refresh() }
+        }
+        SystemNowPlayingClient.shared.start()
     }
 
-    // MARK: - Observation
-
-    private func setupObservers() {
-        let nc = NotificationCenter.default
-        let names: [Notification.Name] = [
-            MediaRemoteClient.nowPlayingInfoChanged,
-            MediaRemoteClient.isPlayingChanged,
-            MediaRemoteClient.appDidChange,
-        ]
-        for name in names {
-            observerTokens.append(
-                nc.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                    Task { @MainActor [weak self] in await self?.refresh() }
-                }
-            )
-        }
+    private var diagnosticsEnabled: Bool {
+        PreferencesManager.shared.showMediaDiagnostics
     }
 
     private func startPolling() {
         pollTask?.cancel()
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.refresh()
-                try? await Task.sleep(for: .seconds(2))
+                await self?.refresh(allowBurstValidation: false)
+                let interval = await self?.currentPollInterval() ?? .seconds(2)
+                try? await Task.sleep(for: interval)
             }
         }
     }
@@ -94,166 +108,314 @@ final class MediaViewModel {
     // MARK: - Refresh
 
     func refresh() async {
-        if await refreshFromSpotifyIfAvailable() {
-            checkMarqueeRestart()
-            return
-        }
-        if await refreshFromMediaRemote() {
-            checkMarqueeRestart()
-            return
-        }
-        await refreshFromCoreAudio()
+        await refresh(allowBurstValidation: true)
+    }
+
+    private func refresh(allowBurstValidation: Bool) async {
+        // System now-playing (perl-adapter) is the primary source for everything that
+        // publishes to macOS — including Spotify with real album art. The resolver then
+        // picks among all live candidates, so a paused Spotify no longer masks a playing
+        // browser. The browser MediaSession JS path remains an opt-in supplement.
+        let mediaRemote = SystemNowPlayingClient.shared.currentSnapshot()
+        let audible = AudibleProcessMonitor.shared.currentlyAudible()
+        let browser = await browserSnapshot(
+            audible: audible,
+            mediaRemoteBundleID: mediaRemote?.sourceBundleID
+        )
+        let mergedRemote = mergedMediaRemoteSnapshot(mediaRemote, browser: browser)
+        let shouldIncludeBrowser = shouldIncludeStandaloneBrowserCandidate(
+            mediaRemote: mergedRemote ?? mediaRemote,
+            browser: browser
+        )
+        let coreAudio = (mediaRemote == nil && browser == nil)
+            ? audible.map(coreAudioSnapshot(for:))
+            : nil
+
+        let resolved = MediaSessionResolver.resolve(
+            candidates: [mergedRemote ?? mediaRemote, shouldIncludeBrowser ? browser : nil, coreAudio],
+            previous: currentSession,
+            previousSourceStillRunning: previousSourceStillRunning()
+        )
+        apply(resolved, allowBurstValidation: allowBurstValidation)
         checkMarqueeRestart()
     }
 
-    /// Bump `marqueeRestartToken` only when the title transitioned between
-    /// two distinct non-empty values (a real track change). Don't bump on
-    /// initial load (nil → value) or unload (value → nil), and don't bump
-    /// when poll/notification returns the same title.
+    /// Queries the browser MediaSession JS path for the best-candidate supported
+    /// browser. Discovery is decoupled from live audio output so a *paused*
+    /// browser tab (no audio) is still read — the audio gate previously hid
+    /// paused Bilibili/YouTube in Dia, Brave, etc.
+    private func browserSnapshot(
+        audible: AudibleProcessMonitor.AudibleApp?,
+        mediaRemoteBundleID: String?
+    ) async -> MediaSessionSnapshot? {
+        var candidates: [AudibleProcessMonitor.AudibleApp] = []
+        var seen: Set<String> = []
+        func add(_ app: AudibleProcessMonitor.AudibleApp?) {
+            guard let app,
+                  browserMediaSessionProvider.isSupported(app.bundleID),
+                  seen.insert(app.bundleID).inserted
+            else { return }
+            candidates.append(app)
+        }
+
+        // Priority: actively-audible > MediaRemote's now-playing app > frontmost
+        // > previous session source (sticky, paused-but-recent).
+        add(audible)
+        add(browserApp(forBundleID: mediaRemoteBundleID))
+        add(browserApp(forBundleID: NSWorkspace.shared.frontmostApplication?.bundleIdentifier))
+        add(browserApp(forBundleID: currentSession?.sourceBundleID))
+
+        if diagnosticsEnabled, !candidates.isEmpty {
+            MediaDiagnosticsLogger.write(
+                "[BrowserCandidates] " + candidates.map(\.bundleID).joined(separator: ",")
+            )
+        }
+
+        for candidate in candidates {
+            if let snapshot = await browserMediaSessionProvider.snapshot(for: candidate) {
+                return snapshot
+            }
+        }
+        return nil
+    }
+
+    private func browserApp(forBundleID bundleID: String?) -> AudibleProcessMonitor.AudibleApp? {
+        guard let bundleID,
+              browserMediaSessionProvider.isSupported(bundleID),
+              let app = NSRunningApplication
+                .runningApplications(withBundleIdentifier: bundleID).first
+        else { return nil }
+        return AudibleProcessMonitor.AudibleApp(
+            pid: app.processIdentifier,
+            bundleID: bundleID,
+            appName: app.localizedName ?? bundleID,
+            appIcon: app.icon
+        )
+    }
+
     private func checkMarqueeRestart() {
-        let current = nowPlayingTitle
+        let current = currentSession?.hasRichTitle == true ? nowPlayingTitle : nil
         if let old = previousTitle, let new = current, old != new {
             marqueeRestartToken &+= 1
         }
         previousTitle = current
     }
 
-    private func refreshFromMediaRemote() async -> Bool {
-        guard let bundleID = await mr.currentlyPlayingBundleID() else { return false }
-        let info = await mr.fetchInfo(forBundle: bundleID)
-        guard let title = info[MediaRemoteClient.InfoKey.title] as? String,
-              !title.isEmpty else { return false }
+    private func coreAudioSnapshot(for audible: AudibleProcessMonitor.AudibleApp) -> MediaSessionSnapshot {
+        let sampledAt = Date()
+        return MediaSessionSnapshot(
+            title: nil,
+            subtitle: nil,
+            artwork: audible.appIcon,
+            sourceAppName: audible.appName,
+            sourceBundleID: audible.bundleID,
+            playbackState: .playing,
+            reportedPlaybackState: .playing,
+            confidence: .appOnly,
+            timestamp: sampledAt,
+            sampledAt: sampledAt,
+            provider: .coreAudio,
+            duration: 0,
+            elapsedTime: 0,
+            playbackRate: nil,
+            debugSourceSummary: "CoreAudio",
+            debugClientBundleID: audible.bundleID,
+            debugRawKeys: ["bundleID", "isRunning"],
+            usedBrowserSupplement: false
+        )
+    }
 
-        let runningApp = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first
-
-        nowPlayingTitle  = title
-        nowPlayingArtist = (info[MediaRemoteClient.InfoKey.artist] as? String).flatMap { $0.isEmpty ? nil : $0 }
-        sourceBundleID   = bundleID
-        sourceAppName    = runningApp?.localizedName ?? bundleID
-        setIsPlayingExternal(await mr.fetchIsPlaying())
-        dataSource       = .mediaRemote
-
-        if let data = info[MediaRemoteClient.InfoKey.artworkData] as? Data,
-           data.count <= 10_000_000,
-           let img = NSImage(data: data) {
-            albumArtwork = img
-        } else {
-            albumArtwork = runningApp?.icon
+    private func mergedMediaRemoteSnapshot(
+        _ mediaRemote: MediaSessionSnapshot?,
+        browser: MediaSessionSnapshot?
+    ) -> MediaSessionSnapshot? {
+        guard var mediaRemote else { return browser }
+        guard let browser,
+              browser.sourceBundleID == mediaRemote.sourceBundleID
+        else {
+            return mediaRemote
         }
 
-        duration    = info[MediaRemoteClient.InfoKey.duration] as? Double ?? 0
-        elapsedTime = info[MediaRemoteClient.InfoKey.elapsed]  as? Double ?? 0
-        scheduleProgressTimer()
-        return true
-    }
+        let needsTitle = mediaRemote.hasRichTitle == false && browser.hasRichTitle
+        let needsArtwork = mediaRemote.artwork == nil && browser.artwork != nil
+        let shouldAdoptBrowserState = shouldPreferBrowserState(over: mediaRemote, browser: browser)
+        let shouldSupplement = needsTitle || needsArtwork || shouldAdoptBrowserState
+        guard shouldSupplement else { return mediaRemote }
 
-    private func refreshFromSpotifyIfAvailable() async -> Bool {
-        let bundleID = "com.spotify.client"
-        guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first,
-              let info = await fetchSpotifyInfo(),
-              !info.title.isEmpty else {
-            return false
+        if needsTitle {
+            mediaRemote.title = browser.title
+            mediaRemote.subtitle = browser.subtitle
+            mediaRemote.confidence = maxConfidence(mediaRemote.confidence, browser.confidence)
+        }
+        if needsArtwork {
+            mediaRemote.artwork = browser.artwork
+        }
+        if shouldAdoptBrowserState {
+            mediaRemote.playbackState = browser.playbackState
+            mediaRemote.reportedPlaybackState = browser.reportedPlaybackState
+            mediaRemote.playbackRate = browser.playbackRate
+            mediaRemote.elapsedTime = browser.elapsedTime
+            if browser.duration > 0 {
+                mediaRemote.duration = browser.duration
+            }
+            mediaRemote.sampledAt = browser.sampledAt
+            mediaRemote.timestamp = browser.timestamp
         }
 
-        nowPlayingTitle  = info.title
-        nowPlayingArtist = info.artist.isEmpty ? nil : info.artist
-        sourceBundleID   = bundleID
-        sourceAppName    = app.localizedName ?? "Spotify"
-        albumArtwork     = app.icon
-        setIsPlayingExternal(info.isPlaying)
-        dataSource       = .mediaRemote
-        duration         = 0
-        elapsedTime      = 0
-        progressTask?.cancel()
-        progressTask = nil
-        return true
+        mediaRemote.usedBrowserSupplement = true
+        mediaRemote.debugSourceSummary = "MediaRemote+BrowserMediaSession"
+        mediaRemote.debugRawKeys = Array(Set(mediaRemote.debugRawKeys + browser.debugRawKeys)).sorted()
+        return mediaRemote
     }
 
-    private struct SpotifyInfo: Sendable {
-        let title: String
-        let artist: String
-        let isPlaying: Bool
+    private func shouldIncludeStandaloneBrowserCandidate(
+        mediaRemote: MediaSessionSnapshot?,
+        browser: MediaSessionSnapshot?
+    ) -> Bool {
+        guard let browser else { return false }
+        guard let mediaRemote else { return true }
+        if mediaRemote.sourceBundleID != browser.sourceBundleID {
+            return true
+        }
+        return browser.hasRichTitle && (
+            mediaRemote.hasRichTitle == false
+                || mediaRemote.playbackState != browser.playbackState
+                || mediaRemote.reportedPlaybackState != browser.reportedPlaybackState
+        )
     }
 
-    private func fetchSpotifyInfo() async -> SpotifyInfo? {
-        let script = """
-        tell application "Spotify"
-            set playerState to player state as string
-            if playerState is "stopped" then return ""
-            set trackName to name of current track
-            set artistName to artist of current track
-            return trackName & "\n" & artistName & "\n" & playerState
-        end tell
-        """
+    private func shouldPreferBrowserState(
+        over mediaRemote: MediaSessionSnapshot,
+        browser: MediaSessionSnapshot
+    ) -> Bool {
+        guard browser.reportedPlaybackState != .unknown else { return false }
+        if mediaRemote.reportedPlaybackState == .unknown {
+            return true
+        }
+        if browser.reportedPlaybackState == .playing && mediaRemote.reportedPlaybackState != .playing {
+            return true
+        }
+        if browser.playbackState == .playing && mediaRemote.playbackState != .playing {
+            return true
+        }
+        if browser.hasRichTitle && mediaRemote.hasRichTitle == false {
+            return true
+        }
+        return false
+    }
 
-        return await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
-                var error: NSDictionary?
-                guard let output = NSAppleScript(source: script)?.executeAndReturnError(&error).stringValue,
-                      !output.isEmpty else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                let parts = output.components(separatedBy: "\n")
-                continuation.resume(returning: SpotifyInfo(
-                    title: parts.first ?? "",
-                    artist: parts.dropFirst().first ?? "",
-                    isPlaying: parts.dropFirst(2).first == "playing"
-                ))
+    private func maxConfidence(_ lhs: MediaConfidence, _ rhs: MediaConfidence) -> MediaConfidence {
+        let score: (MediaConfidence) -> Int = {
+            switch $0 {
+            case .trusted: return 3
+            case .probable: return 2
+            case .appOnly: return 1
             }
         }
+        return score(lhs) >= score(rhs) ? lhs : rhs
     }
 
-    private func refreshFromCoreAudio() async {
-        guard let audible = AudibleProcessMonitor.shared.currentlyAudible() else {
-            // Nothing currently audible. If the previously-known source app is
-            // still alive (likely paused, not closed), keep the last-known
-            // track info visible with isPlaying=false so the user can still
-            // see and operate the controls. Only fully clear when the source
-            // app actually quits.
-            if let prevBundle = sourceBundleID,
-               !NSRunningApplication
-                    .runningApplications(withBundleIdentifier: prevBundle).isEmpty {
-                setIsPlayingExternal(false)
-                progressTask?.cancel()
-                progressTask = nil
-                return
-            }
-            applyNothingPlaying()
+    private func apply(_ snapshot: MediaSessionSnapshot?, allowBurstValidation: Bool) {
+        let previousSample = lastPlaybackSample
+        currentSession = snapshot
+
+        guard let snapshot else {
+            nowPlayingTitle = nil
+            nowPlayingArtist = nil
+            albumArtwork = nil
+            displayPlaybackState = .stopped
+            validatedPlaybackState = .stopped
+            reportedPlaybackState = .stopped
+            sourceAppName = nil
+            sourceBundleID = nil
+            elapsedTime = 0
+            duration = 0
+            dataSource = nil
+            debugSourceSummary = nil
+            debugClientBundleID = nil
+            debugRawKeysSummary = nil
+            didUseBrowserSupplement = false
+            debugPlaybackRate = nil
+            lastPlaybackSample = nil
+            progressTask?.cancel()
+            progressTask = nil
+            burstTask?.cancel()
+            burstTask = nil
             return
         }
-        sourceAppName  = audible.appName
-        sourceBundleID = audible.bundleID
-        albumArtwork   = audible.appIcon
-        setIsPlayingExternal(true)
-        duration       = 0
-        elapsedTime    = 0
-        progressTask?.cancel()
-        progressTask = nil
 
-        if let tab = await BrowserTabFetcher.shared.activeTab(bundleID: audible.bundleID) {
-            nowPlayingTitle  = tab.title
-            nowPlayingArtist = audible.appName
-            dataSource       = .coreAudioWithTab
-        } else {
-            nowPlayingTitle  = audible.appName
+        sourceAppName = snapshot.sourceAppName
+        sourceBundleID = snapshot.sourceBundleID
+        albumArtwork = snapshot.artwork
+        duration = snapshot.duration
+        elapsedTime = snapshot.elapsedTime
+        dataSource = dataSource(for: snapshot.provider)
+        reportedPlaybackState = snapshot.reportedPlaybackState
+        validatedPlaybackState = MediaPlaybackHeuristics.validatedState(for: snapshot, previous: previousSample)
+        debugSourceSummary = snapshot.debugSourceSummary
+        debugClientBundleID = snapshot.debugClientBundleID
+        debugRawKeysSummary = snapshot.debugRawKeys.joined(separator: ",")
+        didUseBrowserSupplement = snapshot.usedBrowserSupplement
+        debugPlaybackRate = snapshot.playbackRate
+
+        switch snapshot.displayKind {
+        case .richMedia:
+            nowPlayingTitle = snapshot.title
+            nowPlayingArtist = diagnosticsEnabled ? diagnosticsSummary(for: snapshot) : snapshot.subtitle
+        case .appPlayback:
+            let appName = snapshot.sourceAppName ?? "App"
+            nowPlayingTitle = appPlaybackTitle(appName: appName, state: displayPlaybackState)
+            nowPlayingArtist = diagnosticsEnabled ? diagnosticsSummary(for: snapshot) : "无法读取媒体标题"
+        case .empty:
+            nowPlayingTitle = nil
             nowPlayingArtist = nil
-            dataSource       = .coreAudioOnly
+        }
+
+        let immediateState = MediaPlaybackHeuristics.immediateState(for: snapshot)
+        let correctedState = correctedDisplayState(immediate: immediateState, validated: validatedPlaybackState)
+        setDisplayPlaybackStateExternal(correctedState)
+
+        if snapshot.displayKind == .appPlayback,
+           let appName = snapshot.sourceAppName {
+            nowPlayingTitle = appPlaybackTitle(appName: appName, state: displayPlaybackState)
+        }
+
+        lastPlaybackSample = snapshot.activitySample
+
+        if duration > 0 {
+            scheduleProgressTimer()
+        } else {
+            progressTask?.cancel()
+            progressTask = nil
+        }
+
+        if diagnosticsEnabled {
+            emitDiagnosticsLog(for: snapshot)
+        }
+
+        if allowBurstValidation,
+           MediaPlaybackHeuristics.needsBurstValidation(for: snapshot, previous: previousSample) {
+            scheduleBurstValidation()
         }
     }
 
-    private func applyNothingPlaying() {
-        nowPlayingTitle  = nil
-        nowPlayingArtist = nil
-        albumArtwork     = nil
-        isPlaying        = false
-        sourceAppName    = nil
-        sourceBundleID   = nil
-        elapsedTime      = 0
-        duration         = 0
-        dataSource       = nil
-        progressTask?.cancel()
-        progressTask = nil
+    private func correctedDisplayState(immediate: PlaybackState, validated: PlaybackState) -> PlaybackState {
+        if immediate == .playing && validated == .paused {
+            return .paused
+        }
+        return immediate
+    }
+
+    private func scheduleBurstValidation() {
+        burstTask?.cancel()
+        burstTask = Task { [weak self] in
+            guard let self else { return }
+            for _ in 0..<burstRefreshCount {
+                try? await Task.sleep(for: burstRefreshInterval)
+                guard !Task.isCancelled else { return }
+                await self.refresh(allowBurstValidation: false)
+            }
+        }
     }
 
     private func scheduleProgressTimer() {
@@ -268,21 +430,24 @@ final class MediaViewModel {
         }
     }
 
-    // MARK: - Transport controls (MR SendCommand + optimistic UI)
+    // MARK: - Transport controls
 
     func togglePlayPause() {
-        isPlaying.toggle()                                  // optimistic UI flip
-        ignoreIsPlayingUntil = Date().addingTimeInterval(3) // 3s grace period
-        marqueeRestartToken &+= 1                            // jump title back to start
+        let optimisticState: PlaybackState = isPlaying ? .paused : .playing
+        validatedPlaybackState = optimisticState
+        setDisplayPlaybackState(optimisticState)
+        ignoreExternalStateUntil = Date().addingTimeInterval(optimisticGuardWindow)
+        // Note: do NOT bump marqueeRestartToken here — play/pause must not re-scroll the
+        // title. The marquee restarts only on an actual title change (checkMarqueeRestart).
         if sourceBundleID == "com.spotify.client" {
             sendSpotifyPlayPause()
         } else {
-            _ = mr.send(.togglePlayPause)
+            SystemNowPlayingClient.shared.togglePlayPause()
         }
     }
 
-    func nextTrack()     { _ = mr.send(.nextTrack) }
-    func previousTrack() { _ = mr.send(.previousTrack) }
+    func nextTrack() { SystemNowPlayingClient.shared.nextTrack() }
+    func previousTrack() { SystemNowPlayingClient.shared.previousTrack() }
 
     func activateSourceApp() {
         guard let bundleID = sourceBundleID,
@@ -299,10 +464,100 @@ final class MediaViewModel {
         }
     }
 
-    /// Apply an `isPlaying` value sourced from refresh paths. Respects the
-    /// user-toggle grace window so optimistic UI doesn't flicker back.
-    private func setIsPlayingExternal(_ value: Bool) {
-        if Date() < ignoreIsPlayingUntil { return }
-        isPlaying = value
+    private func setDisplayPlaybackStateExternal(_ value: PlaybackState) {
+        if Date() < ignoreExternalStateUntil && value != displayPlaybackState {
+            return
+        }
+        setDisplayPlaybackState(value)
+    }
+
+    private func setDisplayPlaybackState(_ value: PlaybackState) {
+        displayPlaybackState = value
+        if currentSession?.displayKind == .appPlayback,
+           let appName = sourceAppName {
+            nowPlayingTitle = appPlaybackTitle(appName: appName, state: value)
+        }
+        if value == .playing, duration > 0 {
+            scheduleProgressTimer()
+        } else if value != .playing {
+            progressTask?.cancel()
+            progressTask = nil
+        }
+    }
+
+    private func previousSourceStillRunning() -> Bool {
+        guard let bundleID = currentSession?.sourceBundleID else { return false }
+        return !NSRunningApplication
+            .runningApplications(withBundleIdentifier: bundleID)
+            .isEmpty
+    }
+
+    private func dataSource(for provider: MediaSessionProviderKind) -> DataSource {
+        switch provider {
+        case .spotify, .mediaRemote:
+            .mediaRemote
+        case .browserMediaSession:
+            .browserMedia
+        case .coreAudio:
+            .coreAudioOnly
+        }
+    }
+
+    private func appPlaybackTitle(appName: String, state: PlaybackState) -> String {
+        switch state {
+        case .playing:
+            "\(appName) 正在播放"
+        case .paused:
+            "\(appName) 已暂停"
+        case .stopped:
+            "\(appName) 已停止"
+        case .unknown:
+            "\(appName) 正在播放"
+        }
+    }
+
+    private func diagnosticsSummary(for snapshot: MediaSessionSnapshot) -> String {
+        let rate = snapshot.playbackRate.map { String(format: "%.2f", $0) } ?? "-"
+        let elapsed = String(format: "%.1f", snapshot.elapsedTime)
+        let client = snapshot.debugClientBundleID ?? "-"
+        let supplement = snapshot.usedBrowserSupplement ? "B+" : "B-"
+        return "src:\(snapshot.debugSourceSummary) client:\(client) rpt:\(snapshot.reportedPlaybackState.label) dsp:\(displayPlaybackState.label) val:\(validatedPlaybackState.label) rate:\(rate) t:\(elapsed) \(supplement)"
+    }
+
+    private func currentPollInterval() -> Duration {
+        guard let snapshot = currentSession else { return defaultPollInterval }
+        let isBrowserSource = snapshot.sourceBundleID.map(browserMediaSessionProvider.isSupported(_:)) ?? false
+        let needsFastPolling =
+            snapshot.provider == .coreAudio
+            || (snapshot.provider == .mediaRemote && snapshot.hasRichTitle == false && isBrowserSource)
+            || (snapshot.provider == .browserMediaSession && snapshot.hasRichTitle == false)
+        return needsFastPolling ? fallbackPollInterval : defaultPollInterval
+    }
+
+    private func emitDiagnosticsLog(for snapshot: MediaSessionSnapshot) {
+        let message = """
+        [MediaDiagnostics] source=\(snapshot.debugSourceSummary) client=\(snapshot.debugClientBundleID ?? "-") \
+        reported=\(snapshot.reportedPlaybackState.label) display=\(displayPlaybackState.label) \
+        validated=\(validatedPlaybackState.label) rate=\(snapshot.playbackRate.map { String(format: "%.2f", $0) } ?? "-") \
+        elapsed=\(String(format: "%.2f", snapshot.elapsedTime)) duration=\(String(format: "%.2f", snapshot.duration)) \
+        supplemented=\(snapshot.usedBrowserSupplement) keys=\(snapshot.debugRawKeys.joined(separator: ","))
+        """
+        print(message)
+        MediaDiagnosticsLogger.write(message)
+    }
+}
+
+private extension PlaybackState {
+    var label: String {
+        switch self {
+        case .playing:
+            "playing"
+        case .paused:
+            "paused"
+        case .stopped:
+            "stopped"
+        case .unknown:
+            "unknown"
+        }
     }
 }

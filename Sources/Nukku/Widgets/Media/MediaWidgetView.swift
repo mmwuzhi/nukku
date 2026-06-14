@@ -5,6 +5,7 @@ struct MediaWidgetView: View {
     @Environment(MediaViewModel.self)  private var vm
     @Environment(NotchViewModel.self)  private var notchVM
     @Environment(\.notchNamespace)     private var notchNS
+    @State private var prefs = PreferencesManager.shared
 
     private var hasContent: Bool {
         vm.nowPlayingTitle != nil
@@ -44,7 +45,7 @@ struct MediaWidgetView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text(displaySubtitle)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(subtitleFont)
                     .foregroundStyle(.white.opacity(hasContent ? 0.55 : 0.42))
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -56,6 +57,13 @@ struct MediaWidgetView: View {
         }
         .frame(height: 50)
         .padding(.horizontal, 8)
+    }
+
+    private var subtitleFont: Font {
+        if prefs.showMediaDiagnostics {
+            return .system(size: 9, weight: .medium, design: .monospaced)
+        }
+        return .system(size: 11, weight: .medium)
     }
 
     private var playPauseButton: some View {

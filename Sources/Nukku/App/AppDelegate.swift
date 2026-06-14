@@ -27,6 +27,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         notchVM.hudViewModel = hudVM
         mediaVM.hudViewModel = hudVM
 
+        // Start the system now-playing listener (perl-adapter). Done here, not in
+        // MediaViewModel.init, so tests can build the VM without spawning a subprocess.
+        mediaVM.startSystemNowPlaying()
+
         // Register widgets with shared registry
         WidgetRegistry.shared.registerDefaults(
             mediaVM:       mediaVM,
@@ -59,6 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         hudVM.stop()
+        SystemNowPlayingClient.shared.stop()
         windowManager?.teardown()
     }
 }

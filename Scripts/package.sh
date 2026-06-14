@@ -52,6 +52,24 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp "$BINARY" "$APP/Contents/MacOS/Nukku"
 
+# Bundle the MediaRemote perl-adapter. The dynamic library goes next to the
+# executable so its @loader_path rpath resolves; run.pl is embedded below.
+ADAPTER_DYLIB=".build/release/libMediaRemoteAdapter.dylib"
+if [ ! -f "$ADAPTER_DYLIB" ]; then
+    echo "Error: $ADAPTER_DYLIB not found. Build release first." >&2
+    exit 1
+fi
+cp "$ADAPTER_DYLIB" "$APP/Contents/MacOS/"
+# Embed run.pl in Resources. The vendored MediaController resolves it via
+# Bundle.main (Contents/Resources) first, so the .app is self-contained and
+# codesign-clean (no content at the bundle root).
+ADAPTER_RUNPL=".build/release/MediaRemoteAdapter_MediaRemoteAdapter.bundle/run.pl"
+if [ ! -f "$ADAPTER_RUNPL" ]; then
+    echo "Error: $ADAPTER_RUNPL not found." >&2
+    exit 1
+fi
+cp "$ADAPTER_RUNPL" "$APP/Contents/Resources/run.pl"
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -89,16 +107,21 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
+# Sign inside-out: nested code (the adapter dylib + its resource bundle) must be
+# signed before the enclosing app, otherwise the app seal is invalid.
 # For ad-hoc signing ("-"), hardened runtime + timestamp aren't applicable.
 # For a real Developer ID, enable hardened runtime and timestamp for notarization.
+DYLIB_IN_APP="$APP/Contents/MacOS/libMediaRemoteAdapter.dylib"
 if [ "$SIGN_IDENTITY" = "-" ]; then
-    echo "==> ad-hoc codesign"
+    echo "==> ad-hoc codesign (adapter dylib, then app)"
+    codesign --force --sign - "$DYLIB_IN_APP"
     codesign --force \
              --entitlements .entitlements/Nukku.entitlements \
              --sign - \
              "$APP"
 else
-    echo "==> codesign ($SIGN_IDENTITY) + hardened runtime"
+    echo "==> codesign ($SIGN_IDENTITY) + hardened runtime (adapter dylib, then app)"
+    codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$DYLIB_IN_APP"
     codesign --force \
              --options runtime \
              --entitlements .entitlements/Nukku.entitlements \
