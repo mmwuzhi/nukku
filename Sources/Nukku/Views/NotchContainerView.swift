@@ -21,6 +21,13 @@ struct NotchContainerView: View {
     private var shapeSpring: Animation {
         vm.isExpanded ? NotchAnimator.expand : NotchAnimator.collapse
     }
+    private var contentAnimation: Animation? {
+        switch presentationMode {
+        case .lock: return nil   // instant swap — never fade content above the lock screen
+        case .open: return NotchAnimator.contentReveal.delay(0.08)
+        default:    return NotchAnimator.contentHide
+        }
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -52,6 +59,16 @@ struct NotchContainerView: View {
                             .transition(.opacity.combined(with: .scale(scale: 0.95)))
                     }
 
+                case .lock:
+                    LockView()
+                        .transition(.opacity)
+
+                case .level:
+                    if let hud = visibleHUD {
+                        CompactHUDView(hud: hud)
+                            .transition(.opacity)
+                    }
+
                 case .open:
                     ExpandedView()
                         .transition(.opacity)
@@ -60,15 +77,15 @@ struct NotchContainerView: View {
             .frame(width: targetWidth, height: targetHeight)
             .clipShape(currentShape)
             .environment(\.notchNamespace, notchNS)
-            .animation(
-                presentationMode == .open
-                    ? NotchAnimator.contentReveal.delay(0.08)
-                    : NotchAnimator.contentHide,
-                value: presentationMode
-            )
+            .animation(contentAnimation, value: presentationMode)
             .animation(shapeSpring, value: vm.state)
             .animation(shapeSpring, value: vm.activeWidgetID)
-            .animation(NotchAnimator.hudTransition, value: hudVM.currentHUD)
+            // Lock swaps in instantly so no outgoing media/notification view can
+            // fade visibly above the secure lock screen; everything else fades.
+            .animation(
+                hudVM.currentHUD?.isLock == true ? nil : NotchAnimator.hudTransition,
+                value: hudVM.currentHUD
+            )
         }
         .frame(
             width:  Constants.Notch.canvasWidth,

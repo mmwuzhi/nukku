@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var notificationService: NotificationService?
     private let screenService = ScreenChangeService()
     private let launchService = LaunchAtLoginService()
+    private let lockService   = LockStateService()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -55,6 +56,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Reposition if screens change
         screenService.onScreenChanged = { [weak mgr] in mgr?.repositionWindow() }
 
+        // Surface a lock/unlock indicator in the notch. On lock, collapse any
+        // expanded widget first so calendar/file/camera content is never left
+        // above the secure lock screen — only the neutral lock glyph shows.
+        lockService.onLock = { [weak notchVM, weak hudVM] in
+            hudVM?.isScreenLocked = true
+            notchVM?.forceCollapse()
+            hudVM?.show(.lock(locked: true))
+        }
+        lockService.onUnlock = { [weak hudVM] in
+            hudVM?.isScreenLocked = false
+            hudVM?.show(.lock(locked: false))
+        }
+        lockService.start()
+
         // Register for launch at login if not already
         if !launchService.isEnabled {
             launchService.enable()
@@ -62,6 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        lockService.stop()
         hudVM.stop()
         SystemNowPlayingClient.shared.stop()
         windowManager?.teardown()

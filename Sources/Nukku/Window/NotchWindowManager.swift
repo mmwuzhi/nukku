@@ -1,4 +1,5 @@
 import AppKit
+import SkyLightWindow
 import SwiftUI
 
 @MainActor
@@ -17,6 +18,10 @@ final class NotchWindowManager {
     private var mouseDownMonitor: Any?
     private var isCursorInHoverZone: Bool = false
     private var isMouseTrackingActive: Bool = false
+
+    // App that held key-window status before the panel took it on expand, so we
+    // can hand focus back on collapse.
+    private var appBeforeKey: NSRunningApplication?
 
     init(notchViewModel: NotchViewModel, mediaViewModel: MediaViewModel, hudViewModel: HUDViewModel) {
         self.notchViewModel = notchViewModel
@@ -93,7 +98,20 @@ final class NotchWindowManager {
         panel.ignoresMouseEvents = true   // start in pass-through mode; toggled by mouse monitor
         panel.orderFrontRegardless()
 
+        // Float above native full-screen apps via private SkyLight APIs (no public API
+        // can render over another app's full-screen notch/menubar bar). Must run after
+        // orderFront so the window has a valid windowNumber. Keeps the existing panel,
+        // hit-testing, and mouse monitors intact.
+        SkyLightOperator.shared.delegateWindow(panel)
+
         startMouseMonitor()
+
+        // Take key-window status while expanded so the notch owns the cursor
+        // (a non-key panel loses cursor control to the app behind it), then hand
+        // focus back on collapse.
+        notchViewModel?.onExpandedChange = { [weak self] expanded in
+            self?.setPanelKey(expanded)
+        }
 
         // Start global hotkey (checks enabled flag on each keypress)
         hotkeyService.start { [weak self] in
@@ -283,6 +301,30 @@ final class NotchWindowManager {
         guard currentTransportControlZoneScreenRect().contains(cursor) else { return }
         mediaViewModel.togglePlayPause()
         handleMouseMove()
+    }
+
+    // MARK: - Key-window handoff (cursor authority while expanded)
+
+    private func setPanelKey(_ shouldBeKey: Bool) {
+        guard let panel else { return }
+        if shouldBeKey {
+            // Only an explicit click-to-expand grants key-window status. On the
+            // default hover trigger the panel must stay non-key so passive hovering
+            // never swallows the front app's keyboard input. Click users still get
+            // native per-control cursors once the panel is key.
+            guard PreferencesManager.shared.expandTrigger == .click else { return }
+            guard !panel.isKeyWindow else { return }
+            // Remember who had focus so we can restore it on collapse. We are a
+            // non-activating accessory app, so this is always the user's app.
+            appBeforeKey = NSWorkspace.shared.frontmostApplication
+            panel.makeKey()
+        } else {
+            // Returning key to the previous app also resigns ours.
+            if panel.isKeyWindow, let appBeforeKey {
+                appBeforeKey.activate()
+            }
+            appBeforeKey = nil
+        }
     }
 
     // MARK: - Reposition (screen change only, no animation)

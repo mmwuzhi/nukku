@@ -9,6 +9,7 @@ enum HUDType: @unchecked Sendable {
     case brightness(level: Float)
     case battery(level: Float, isCharging: Bool)
     case notification(appName: String, title: String, icon: NSImage?)
+    case lock(locked: Bool)
 
     var iconName: String {
         switch self {
@@ -24,6 +25,7 @@ enum HUDType: @unchecked Sendable {
             default:      return "battery.0"
             }
         case .notification: return "bell.fill"
+        case .lock(let locked): return locked ? "lock.fill" : "lock.open.fill"
         }
     }
 
@@ -33,6 +35,7 @@ enum HUDType: @unchecked Sendable {
         case .brightness(let l):  return l
         case .battery(let l, _):  return l
         case .notification:       return 0
+        case .lock:               return 0
         }
     }
 
@@ -48,18 +51,37 @@ enum HUDType: @unchecked Sendable {
             return "\(Int((l * 100).rounded()))%"
         case .notification:
             return nil
+        case .lock:
+            return nil
         }
     }
 
     var dismissDuration: Double {
         switch self {
         case .notification:  return 3.0
+        case .lock:          return 2.0
         default:             return 1.5
         }
     }
 
     var isNotification: Bool {
         if case .notification = self { return true }
+        return false
+    }
+
+    var isLock: Bool {
+        if case .lock = self { return true }
+        return false
+    }
+
+    var isMuted: Bool {
+        if case .volume(_, let muted) = self { return muted }
+        return false
+    }
+
+    /// Brightness uses the warm accent fill; everything else reads in white.
+    var usesAccentFill: Bool {
+        if case .brightness = self { return true }
         return false
     }
 }
@@ -75,6 +97,8 @@ extension HUDType: Equatable {
             return l1 == l2 && c1 == c2
         case (.notification(let a1, let t1, _), .notification(let a2, let t2, _)):
             return a1 == a2 && t1 == t2
+        case (.lock(let l1), .lock(let l2)):
+            return l1 == l2
         default:
             return false
         }
@@ -85,6 +109,10 @@ extension HUDType: Equatable {
 @MainActor
 final class HUDViewModel {
     var currentHUD: HUDType? = nil
+
+    /// True between `com.apple.screenIsLocked` and `…Unlocked`. While locked the
+    /// notch must not surface notification content above the secure lock screen.
+    var isScreenLocked: Bool = false
 
     private let volumeMonitor     = VolumeMonitor()
     private let brightnessMonitor = BrightnessMonitor()
@@ -124,10 +152,23 @@ final class HUDViewModel {
     // MARK: - Show (internal so NotificationService can call it)
 
     func show(_ hud: HUDType) {
-        // A notification in progress cannot be interrupted by vol/brightness events
-        if let current = currentHUD, current.isNotification, !hud.isNotification { return }
+        // While the secure lock screen is up, only the neutral lock indicator may
+        // appear — never media, volume, brightness, or notification content, which
+        // would otherwise show through the lock-screen-level SkyLight window.
+        if isScreenLocked, !hud.isLock { return }
+        // A notification in progress cannot be interrupted by vol/brightness events,
+        // but a lock/unlock indicator always wins — it must mask content on lock.
+        if let current = currentHUD, current.isNotification, !hud.isNotification, !hud.isLock { return }
         currentHUD = hud
-        scheduleDismiss(duration: hud.dismissDuration)
+        // The "locked" glyph must persist for the whole locked period; otherwise a
+        // dismissal would drop back to .rest and re-expose media art above the lock
+        // screen. The "unlocked" glyph dismisses normally back to the live notch.
+        if case .lock(true) = hud {
+            dismissTask?.cancel()
+            dismissTask = nil
+        } else {
+            scheduleDismiss(duration: hud.dismissDuration)
+        }
     }
 
     // MARK: - Private

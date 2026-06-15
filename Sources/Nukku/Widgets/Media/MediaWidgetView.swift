@@ -30,9 +30,16 @@ struct MediaWidgetView: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            artwork
-                .frame(width: 42, height: 42)
-                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            Button {
+                vm.activateSourceApp()
+            } label: {
+                artwork
+                    .frame(width: 42, height: 42)
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(!vm.hasMediaSession)
 
             VStack(alignment: .leading, spacing: 2) {
                 MarqueeText(

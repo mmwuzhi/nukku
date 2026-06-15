@@ -34,39 +34,15 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
         return interactiveRect().contains(local) ? super.hitTest(point) : nil
     }
 
-    // MARK: - Cursor management dead ends
+    // MARK: - Cursor authority
     //
-    // Goal: show a pointing-hand cursor over interactive controls (e.g. the
-    // Media widget's play/pause button) instead of letting the underlying
-    // app's cursor (often I-beam over a text editor) bleed through.
-    //
-    // Why this is hard for us: Nukku's NSPanel is non-activating
-    // (becomesKeyOnlyIfNeeded = true, .canJoinAllSpaces, high level). It
-    // doesn't hold cursor authority — the OS keeps querying the underlying
-    // app for cursorUpdate and that wins each mouseMoved (1 kHz mouse rate).
-    //
-    // Approaches tried, in order, and why each failed on macOS 26:
-    //   1. SwiftUI .pointerStyle(.link)         — never propagates to the system
-    //                                              cursor manager from this panel
-    //   2. SwiftUI .onHover + NSCursor.push/pop — push gets overridden by the
-    //                                              next mouseMoved from below
-    //   3. 30 Hz Timer + NSCursor.set()         — mouse moves at ~1 kHz, our
-    //                                              set is overridden between ticks
-    //   4. AppKit addCursorRect (resetCursorRects) — cursor rects need a key
-    //                                              window; ours isn't
-    //   5. NSTrackingArea + .cursorUpdate       — fires on enter/exit only;
-    //                                              re-entries into SwiftUI button
-    //                                              subviews use their own (default)
-    //                                              cursor
-    //   6. Above + .mouseMoved + manual re-claim — still loses on most controls
-    //
-    // Decision: do not run cursor-claiming code here. The Media widget's UX
-    // was redesigned (single big ⏯ button, marquee title) so the cursor cue
-    // is no longer load-bearing; half-working cursor hacks cause more uncanny
-    // behavior than a plain arrow/I-beam inherited from the underlying app.
-    //
-    // If a future macOS release re-grants cursor authority to non-activating
-    // panels, approaches 4 (addCursorRect) or 1 (pointerStyle) would be the
-    // cleanest to revisit.
+    // The cursor seen inside the panel is owned by whichever window is *key*.
+    // A non-key window cannot win cursor management against the key app, so any
+    // view-level claim here (cursorUpdate / mouseMoved / addCursorRect / timed
+    // NSCursor.set) loses to the underlying app and its I-beam/link cursor bleeds
+    // through. The only fix is to make the panel key, which NotchWindowManager
+    // does on expand (see `setPanelKey`). Once key, SwiftUI manages per-control
+    // cursors natively (hand on buttons, arrow elsewhere), so no code is needed
+    // here.
 
 }

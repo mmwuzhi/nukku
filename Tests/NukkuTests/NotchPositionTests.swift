@@ -82,12 +82,29 @@ struct NotchViewModelTests {
         let hudVM = HUDViewModel()
         vm.hudViewModel = hudVM
         vm.forceCollapse()
+
+        // Volume/brightness/battery read out inside the resting silhouette — no
+        // expansion into the wide pill.
         hudVM.show(.volume(level: 0.5, muted: false))
+        #expect(vm.presentationMode == .level)
+        #expect(vm.targetInteractiveSize.width == max(
+            Constants.Geometry.rest.topWidth,
+            Constants.Geometry.rest.bodyWidth
+        ))
+        #expect(vm.targetInteractiveSize.height == Constants.Geometry.rest.height)
+
+        // Notifications still use the wider pill (they need room for text).
+        hudVM.show(.notification(appName: "Mail", title: "Hi", icon: nil))
         #expect(vm.presentationMode == .hud)
         #expect(vm.targetInteractiveSize.width == max(
             Constants.Geometry.hud.topWidth,
             Constants.Geometry.hud.bodyWidth
         ))
         #expect(vm.targetInteractiveSize.height == Constants.Geometry.hud.height)
+
+        // The lock indicator also stays inside the resting silhouette.
+        hudVM.show(.lock(locked: true))
+        #expect(vm.presentationMode == .lock)
+        #expect(vm.targetInteractiveSize.height == Constants.Geometry.rest.height)
     }
 }

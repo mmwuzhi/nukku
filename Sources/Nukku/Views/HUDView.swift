@@ -5,6 +5,8 @@ struct HUDView: View {
     let hud: HUDType
 
     var body: some View {
+        // Lock/unlock is rendered by LockView in the resting silhouette, so it
+        // never reaches here — only vol/brightness/battery/notification do.
         if case .notification(let appName, let title, let icon) = hud {
             notificationLayout(appName: appName, title: title, icon: icon)
         } else {
@@ -92,11 +94,4 @@ struct HUDView: View {
         .padding(.bottom, 7)
     }
 
-}
-
-private extension HUDType {
-    var usesAccentFill: Bool {
-        if case .brightness = self { return true }
-        return false
-    }
 }

@@ -9,7 +9,9 @@ enum NotchState: Equatable {
 enum NotchPresentationMode: Equatable {
     case rest
     case open
-    case hud
+    case hud     // wide pill — notifications (need room for text)
+    case lock    // resting silhouette — lock glyph
+    case level   // resting silhouette — volume / brightness / battery readout
 }
 
 @Observable
@@ -46,7 +48,14 @@ final class NotchViewModel {
     /// Single presentation state for both shape and content. Normal HUDs own
     /// the surface when collapsed, otherwise the notch state decides rest/open.
     var presentationMode: NotchPresentationMode {
-        if hudViewModel?.currentHUD != nil && !isExpanded { return .hud }
+        if let hud = hudViewModel?.currentHUD, !isExpanded {
+            // Only notifications need the wider pill. Lock and the level readouts
+            // (volume/brightness/battery) stay inside the resting silhouette,
+            // styled like the collapsed now-playing shelves.
+            if hud.isLock { return .lock }
+            if hud.isNotification { return .hud }
+            return .level
+        }
         return isExpanded ? .open : .rest
     }
 
@@ -57,6 +66,7 @@ final class NotchViewModel {
         case .rest: return Constants.Geometry.rest
         case .open: return Constants.Geometry.open(height: targetExpandedHeight)
         case .hud:  return Constants.Geometry.hud
+        case .lock, .level: return Constants.Geometry.rest   // same silhouette as rest — no expansion
         }
     }
 
@@ -68,12 +78,20 @@ final class NotchViewModel {
         return CGSize(width: max(m.topWidth, m.bodyWidth), height: m.height)
     }
 
+    /// Fired when the panel crosses the expanded/collapsed boundary. The window
+    /// manager uses it to take key-window status while expanded (so the cursor is
+    /// owned by the notch, not the app behind it) and hand focus back on collapse.
+    @ObservationIgnored
+    var onExpandedChange: ((Bool) -> Void)?
+
     private var collapseTask: Task<Void, Never>?
     private var hoverEnterTask: Task<Void, Never>?
 
     // MARK: - Expand / Collapse
 
     func expand() {
+        // Do not reveal widgets above the secure lock screen.
+        guard hudViewModel?.isScreenLocked != true else { return }
         collapseTask?.cancel()
         collapseTask = nil
         hoverEnterTask?.cancel()
@@ -83,11 +101,13 @@ final class NotchViewModel {
         }
         activateCurrentWidget()
         state = .expanded
+        onExpandedChange?(true)
     }
 
     /// Schedule expand after a short dwell — masks accidental cursor crossings.
     /// Called from hover-enter; balanced by cancelHoverEnter on hover-exit.
     func scheduleHoverExpand() {
+        guard hudViewModel?.isScreenLocked != true else { return }
         hoverEnterTask?.cancel()
         hoverEnterTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(Constants.Notch.hoverDwellSeconds))
@@ -112,6 +132,7 @@ final class NotchViewModel {
             guard !Task.isCancelled else { return }
             deactivateCurrentWidget()
             state = .collapsed
+            onExpandedChange?(false)
         }
     }
 
@@ -123,6 +144,7 @@ final class NotchViewModel {
         hoverEnterTask = nil
         deactivateCurrentWidget()
         state = .collapsed
+        onExpandedChange?(false)
     }
 
     // MARK: - Widget Lifecycle
