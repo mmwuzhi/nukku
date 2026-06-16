@@ -44,32 +44,35 @@ private struct FileItemView: View {
     let vm: FileDropViewModel
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 5) {
             Group {
                 if let icon = file.icon {
                     Image(nsImage: icon)
                         .resizable()
-                        .frame(width: 36, height: 36)
+                        .frame(width: 38, height: 38)
                 } else {
                     Image(systemName: "doc")
-                        .font(.system(size: 28))
+                        .font(.system(size: 30))
                         .foregroundStyle(.secondary)
                 }
             }
             Text(file.name)
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .frame(width: 48)
+                .font(.system(size: 11))
+                .foregroundStyle(Color.nukkuSecondaryLabel)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(width: 64)
         }
         .contentShape(Rectangle())
-        .onTapGesture { vm.open(file) }
-        .contextMenu {
-            Button("在 Finder 中显示") { vm.reveal(file) }
-            Button("打开") { vm.open(file) }
-            Divider()
-            Button("移除", role: .destructive) { vm.remove(file) }
-        }
+        .help(file.name)
+        .overlay(
+            FileItemInteraction(
+                url: file.url,
+                icon: file.icon,
+                onOpen: { vm.open(file) },
+                onReveal: { vm.reveal(file) },
+                onRemove: { vm.remove(file) }
+            )
+        )
     }
 }

@@ -45,7 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { await ns.start() }
 
         // Build and display the notch window
-        let mgr = NotchWindowManager(notchViewModel: notchVM, mediaViewModel: mediaVM, hudViewModel: hudVM)
+        let mgr = NotchWindowManager(notchViewModel: notchVM, mediaViewModel: mediaVM, hudViewModel: hudVM, fileDropViewModel: fileDropVM)
         mgr.setupWindow()
         windowManager = mgr
 

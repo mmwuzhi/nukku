@@ -18,14 +18,28 @@ final class FileDropViewModel {
             provider.loadItem(forTypeIdentifier: "public.file-url") { [weak self] item, _ in
                 guard let data = item as? Data,
                       let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
-                let resolvedURL = url.resolvingSymlinksInPath()
-                let icon = NSWorkspace.shared.icon(forFile: resolvedURL.path)
                 Task { @MainActor [weak self] in
-                    self?.files.insert(DroppedFile(url: resolvedURL, icon: icon), at: 0)
+                    self?.ingest(urls: [url])
                 }
             }
         }
         return true
+    }
+
+    /// Adds file URLs to the shelf (most-recent first). Shared by the SwiftUI
+    /// `.onDrop` path and the AppKit drag-catcher path. Skips files already on the
+    /// shelf; an existing entry is re-surfaced to the front instead of duplicated.
+    func ingest(urls: [URL]) {
+        for url in urls {
+            let resolvedURL = url.resolvingSymlinksInPath()
+            if let existing = files.firstIndex(where: { $0.url == resolvedURL }) {
+                let item = files.remove(at: existing)
+                files.insert(item, at: 0)
+                continue
+            }
+            let icon = NSWorkspace.shared.icon(forFile: resolvedURL.path)
+            files.insert(DroppedFile(url: resolvedURL, icon: icon), at: 0)
+        }
     }
 
     func open(_ file: DroppedFile) {

@@ -8,7 +8,9 @@ final class NotchWindowManager {
     private weak var notchViewModel: NotchViewModel?
     private let mediaViewModel: MediaViewModel
     private let hudViewModel: HUDViewModel
+    private let fileDropViewModel: FileDropViewModel
     private let hotkeyService = HotkeyService()
+    private let dropCatcher = NotchDropCatcher()
 
     // Cursor tracking for hover detection + click-through gating. A global
     // mouse-move monitor starts a 15 Hz poller only while the pointer is near
@@ -18,15 +20,22 @@ final class NotchWindowManager {
     private var mouseDownMonitor: Any?
     private var isCursorInHoverZone: Bool = false
     private var isMouseTrackingActive: Bool = false
+    // True between a catcher draggingEntered and the drag ending. While set, the
+    // hover poller must not flip the main panel opaque (it would steal the drag).
+    private var isDragActive: Bool = false
 
     // App that held key-window status before the panel took it on expand, so we
     // can hand focus back on collapse.
     private var appBeforeKey: NSRunningApplication?
 
-    init(notchViewModel: NotchViewModel, mediaViewModel: MediaViewModel, hudViewModel: HUDViewModel) {
-        self.notchViewModel = notchViewModel
-        self.mediaViewModel = mediaViewModel
-        self.hudViewModel   = hudViewModel
+    init(notchViewModel: NotchViewModel,
+         mediaViewModel: MediaViewModel,
+         hudViewModel: HUDViewModel,
+         fileDropViewModel: FileDropViewModel) {
+        self.notchViewModel    = notchViewModel
+        self.mediaViewModel    = mediaViewModel
+        self.hudViewModel      = hudViewModel
+        self.fileDropViewModel = fileDropViewModel
     }
 
     // MARK: - Setup
@@ -118,6 +127,29 @@ final class NotchWindowManager {
             guard let vm = self?.notchViewModel else { return }
             if vm.isExpanded { vm.forceCollapse() } else { vm.expand() }
         }
+
+        // Drag-to-shelf input for the FileDrop widget (detector strip + drop tray).
+        dropCatcher.setup(
+            detectorFrame:  dropDetectorFrame(for: screen),
+            trayFrame:      dropTrayFrame(for: screen),
+            mainPanelLevel: panel.level
+        )
+        dropCatcher.isEnabled = {
+            WidgetRegistry.shared.enabledWidgets.contains { $0.id == "filedrop" }
+        }
+        dropCatcher.onDragEnter = { [weak self] in
+            // The tray is the drop UI, so the main panel does not expand. Keep it
+            // mouse-transparent for the whole drag so the hover poller cannot flip
+            // it opaque and steal drag events from the detector below it.
+            self?.isDragActive = true
+            self?.panel?.ignoresMouseEvents = true
+        }
+        dropCatcher.onDrop = { [weak self] urls in
+            self?.fileDropViewModel.ingest(urls: urls)
+        }
+        dropCatcher.onDragEnd = { [weak self] in
+            self?.isDragActive = false
+        }
     }
 
     // MARK: - Mouse monitor (hover + click-through gating)
@@ -143,7 +175,6 @@ final class NotchWindowManager {
         mouseDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { [weak self] _ in
             Task { @MainActor in self?.handleGlobalMouseDown() }
         }
-
         panel?.handleLeftMouseDownInScreen = { [weak self] point in
             guard let self else { return false }
             return self.handlePanelLeftMouseDown(at: point)
@@ -267,6 +298,12 @@ final class NotchWindowManager {
 
     private func handleMouseMove() {
         guard let panel, let vm = notchViewModel else { return }
+        // During an active file drag the catcher (below the main panel) owns event
+        // delivery; keep the main panel transparent so it cannot intercept the drag.
+        if isDragActive {
+            panel.ignoresMouseEvents = true
+            return
+        }
         let cursor = NSEvent.mouseLocation  // screen coords, bottom-origin
         guard isNearTopRegion(cursor) else {
             stopTopRegionPolling()
@@ -339,11 +376,16 @@ final class NotchWindowManager {
         if screen.hasNotch { notchViewModel?.collapsedWidth = screen.notchWidth }
 
         panel.setFrame(canvasFrame(for: screen), display: false)
+        dropCatcher.updateFrames(
+            detectorFrame: dropDetectorFrame(for: screen),
+            trayFrame:     dropTrayFrame(for: screen)
+        )
     }
 
     func teardown() {
         hotkeyService.stop()
         stopMouseMonitor()
+        dropCatcher.teardown()
         panel?.handleLeftMouseDownInScreen = nil
         panel?.close()
         panel = nil
@@ -364,6 +406,39 @@ final class NotchWindowManager {
             y: sf.maxY - Constants.Notch.canvasHeight,
             width:  Constants.Notch.canvasWidth,
             height: Constants.Notch.canvasHeight
+        )
+    }
+
+    /// Detector strip: a thin invisible band over the notch that fires the initial
+    /// drag-enter. Kept to the notch width so it never swallows menu-bar clicks
+    /// beside the notch; extends a little below so an approaching drag reaches it.
+    private func dropDetectorFrame(for screen: NSScreen) -> NSRect {
+        let sf = screen.frame
+        let width = notchViewModel?.collapsedWidth ?? Constants.Notch.collapsedWidth
+        let height = (notchViewModel?.collapsedHeight ?? Constants.Notch.collapsedHeight) + 44
+        return NSRect(
+            x: sf.midX - width / 2,
+            y: sf.maxY - height,
+            width:  width,
+            height: height
+        )
+    }
+
+    /// Drop tray: the visible drop affordance, dropped just below the notch. Sized
+    /// generously and overlapping the notch band so the cursor can move continuously
+    /// from the detector strip down onto the tray without crossing a dead gap.
+    private func dropTrayFrame(for screen: NSScreen) -> NSRect {
+        let sf = screen.frame
+        let notchH = notchViewModel?.collapsedHeight ?? Constants.Notch.collapsedHeight
+        let width: CGFloat = 360
+        let height: CGFloat = 180
+        // Top edge at the notch's bottom: the tray drops out from under the notch
+        // and still overlaps the detector strip so the drag transfers without a gap.
+        return NSRect(
+            x: sf.midX - width / 2,
+            y: sf.maxY - notchH - height,
+            width:  width,
+            height: height
         )
     }
 }
