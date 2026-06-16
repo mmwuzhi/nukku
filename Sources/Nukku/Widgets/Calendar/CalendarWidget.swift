@@ -8,7 +8,7 @@ enum CalendarWidget {
             displayName: "日历",
             iconName: "calendar",
             accentColor: .red,
-            preferredSize: CGSize(width: 280, height: 180),
+            preferredSize: CGSize(width: 280, height: 236),
             activate: { Task { await viewModel.activate() } },
             deactivate: { viewModel.deactivate() }
         ) {

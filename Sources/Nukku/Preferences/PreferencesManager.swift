@@ -76,6 +76,15 @@ final class PreferencesManager {
         set { showMediaDiagnosticsRaw = newValue }
     }
 
+    // Calendar identifiers the user has hidden in the calendar widget. Stored as a
+    // newline-joined string because @AppStorage cannot hold a Set.
+    @ObservationIgnored
+    @AppStorage("hiddenCalendarIDs") private var hiddenCalendarIDsRaw: String = ""
+    var hiddenCalendarIDs: Set<String> {
+        get { Set(hiddenCalendarIDsRaw.split(separator: "\n").map(String.init)) }
+        set { hiddenCalendarIDsRaw = newValue.sorted().joined(separator: "\n") }
+    }
+
     func hotkeyComponents() -> (NSEvent.ModifierFlags, UInt16) {
         hotkeyPreset.components
     }
