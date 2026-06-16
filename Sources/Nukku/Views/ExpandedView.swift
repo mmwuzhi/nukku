@@ -1,7 +1,9 @@
+import AppKit
 import SwiftUI
 
 struct ExpandedView: View {
     @Environment(NotchViewModel.self) private var viewModel
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         let registry = WidgetRegistry.shared
@@ -20,6 +22,14 @@ struct ExpandedView: View {
                             viewModel.setActive(widget.id)
                         }
                     }
+                }
+                Spacer(minLength: 8)
+                // The notch is the app's only surface and it runs as a menu-less
+                // accessory, so this gear is the sole entry to the Settings scene.
+                // Activate first so the window comes to the front of the inactive app.
+                SettingsTile {
+                    NSApp.activate(ignoringOtherApps: true)
+                    openSettings()
                 }
             }
             .frame(maxWidth: .infinity)
@@ -89,5 +99,23 @@ private struct TabTile: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(widget.displayName)
+    }
+}
+
+// MARK: - Settings tile
+
+private struct SettingsTile: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "gearshape")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(Color.nukkuInactiveTab)
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("偏好设置")
     }
 }

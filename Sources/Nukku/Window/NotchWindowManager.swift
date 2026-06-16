@@ -212,8 +212,12 @@ final class NotchWindowManager {
         isMouseTrackingActive = false
         isCursorInHoverZone = false
         mediaViewModel.isHoveringTransportControl = false
-        notchViewModel?.cancelHoverExpand()
-        notchViewModel?.collapse()
+        // Auto-collapse on leaving the top region is a hover-mode behavior. In click
+        // mode the panel stays open until an explicit tap toggles it.
+        if PreferencesManager.shared.expandTrigger == .hover {
+            notchViewModel?.cancelHoverExpand()
+            notchViewModel?.collapse()
+        }
         panel?.ignoresMouseEvents = true
     }
 
@@ -318,6 +322,10 @@ final class NotchWindowManager {
 
         guard insideExpandZone != isCursorInHoverZone else { return }
         isCursorInHoverZone = insideExpandZone
+        // Hover-to-expand only applies to the hover trigger. In click mode the panel
+        // must wait for an explicit tap (NotchInteractionModifier), so passive hover
+        // neither expands nor auto-collapses it.
+        guard PreferencesManager.shared.expandTrigger == .hover else { return }
         if insideExpandZone {
             vm.scheduleHoverExpand()
         } else {

@@ -25,6 +25,12 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
         NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
     }
 
+    /// Deliver the first click to the control even when the panel is non-key.
+    /// In hover mode the panel never becomes key, so without this every click is
+    /// treated as a window-activating "first mouse" and swallowed, making tabs and
+    /// buttons feel unresponsive (needing a second click).
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     /// Gate: pass clicks only if they land inside the visible silhouette.
     override func hitTest(_ point: NSPoint) -> NSView? {
         // point arrives in the superview's coordinate system.
