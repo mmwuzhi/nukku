@@ -8,8 +8,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let calendarVM      = CalendarViewModel()
     let fileDropVM      = FileDropViewModel()
     let hudVM           = HUDViewModel()
-    let appLauncherVM   = AppLauncherViewModel()
-    let shortcutsVM     = ShortcutsViewModel()
     let cameraVM        = CameraViewModel()
 
     private var windowManager: NotchWindowManager?
@@ -34,12 +32,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Register widgets with shared registry
         WidgetRegistry.shared.registerDefaults(
-            mediaVM:       mediaVM,
-            calendarVM:    calendarVM,
-            fileDropVM:    fileDropVM,
-            appLauncherVM: appLauncherVM,
-            shortcutsVM:   shortcutsVM,
-            cameraVM:      cameraVM
+            mediaVM:    mediaVM,
+            calendarVM: calendarVM,
+            fileDropVM: fileDropVM,
+            cameraVM:   cameraVM
         )
 
         // Start HUD monitoring (volume + brightness + battery) and notification interception

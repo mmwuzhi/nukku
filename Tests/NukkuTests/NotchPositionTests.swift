@@ -9,17 +9,14 @@ struct WidgetRegistryTests {
         let mediaVM       = MediaViewModel()
         let calVM         = CalendarViewModel()
         let fileVM        = FileDropViewModel()
-        let launcherVM    = AppLauncherViewModel()
-        let shortcutsVM   = ShortcutsViewModel()
         let cameraVM      = CameraViewModel()
         let registry      = WidgetRegistry.shared
         registry.registerDefaults(
             mediaVM: mediaVM,
             calendarVM: calVM, fileDropVM: fileVM,
-            appLauncherVM: launcherVM, shortcutsVM: shortcutsVM,
             cameraVM: cameraVM
         )
-        #expect(registry.widgets.count == 6)
+        #expect(registry.widgets.count == 4)
     }
 
     @Test("All default widgets enabled")
@@ -28,14 +25,11 @@ struct WidgetRegistryTests {
         let mediaVM       = MediaViewModel()
         let calVM         = CalendarViewModel()
         let fileVM        = FileDropViewModel()
-        let launcherVM    = AppLauncherViewModel()
-        let shortcutsVM   = ShortcutsViewModel()
         let cameraVM      = CameraViewModel()
         let registry      = WidgetRegistry.shared
         registry.registerDefaults(
             mediaVM: mediaVM,
             calendarVM: calVM, fileDropVM: fileVM,
-            appLauncherVM: launcherVM, shortcutsVM: shortcutsVM,
             cameraVM: cameraVM
         )
         #expect(registry.enabledWidgets.count == registry.widgets.count)

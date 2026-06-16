@@ -15,16 +15,12 @@ final class WidgetRegistry {
         mediaVM: MediaViewModel,
         calendarVM: CalendarViewModel,
         fileDropVM: FileDropViewModel,
-        appLauncherVM: AppLauncherViewModel,
-        shortcutsVM: ShortcutsViewModel,
         cameraVM: CameraViewModel
     ) {
         widgets = [
             MediaWidget.box(viewModel: mediaVM),
             CalendarWidget.box(viewModel: calendarVM),
             FileDropWidget.box(viewModel: fileDropVM),
-            AppLauncherWidget.box(viewModel: appLauncherVM),
-            ShortcutsWidget.box(viewModel: shortcutsVM),
             CameraWidget.box(viewModel: cameraVM)
         ]
     }

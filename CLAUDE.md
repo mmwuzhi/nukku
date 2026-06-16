@@ -94,8 +94,7 @@ Sources/Nukku/
 │                       LaunchAtLoginService, ScreenChangeService, NotificationService
 ├── Utilities/          Constants.swift, Extensions (NSScreen+Notch, Color+Theme)
 ├── ViewModels/         NotchViewModel, MediaViewModel, CalendarViewModel,
-│                       FileDropViewModel, AppLauncherViewModel,
-│                       ShortcutsViewModel, CameraViewModel, HUDViewModel
+│                       FileDropViewModel, CameraViewModel, HUDViewModel
 ├── Views/              NotchContainerView, CollapsedView, ExpandedView,
 │                       NotchShapeView, HUDView
 ├── Widgets/
@@ -105,8 +104,6 @@ Sources/Nukku/
 │   │                   MediaSessionModels, MediaArtworkCache
 │   ├── FileDrop/       FileDropWidget, FileDropWidgetView
 │   ├── Calendar/       CalendarWidget, CalendarWidgetView, EventKitClient
-│   ├── AppLauncher/    AppLauncherWidget, AppLauncherWidgetView
-│   ├── Shortcuts/      ShortcutsWidget, ShortcutsWidgetView
 │   └── Camera/         CameraWidget, CameraWidgetView
 └── Window/             NotchPanel, NotchWindowManager, TrackingHostingView (NotchHostingView)
 ```
@@ -176,7 +173,7 @@ The `activate`/`deactivate` callbacks are called automatically by `NotchViewMode
 
 See the plan file at `.claude/plans/` for the full feature checklist. Short version:
 
-**Done**: fixed-window arch, fused notch silhouette, collapsed media shelves, trusted media-session display, browser/Spotify-aware media detection, AppKit transport hit-testing, HUD (volume + brightness + battery + notifications), preferences, calendar auto-refresh, app launcher / shortcuts / camera widgets, packaging + hardened runtime.
+**Done**: fixed-window arch, fused notch silhouette, collapsed media shelves, trusted media-session display, browser/Spotify-aware media detection, AppKit transport hit-testing, HUD (volume + brightness + battery + notifications), preferences, calendar auto-refresh, camera widget, drag-to-expand file shelf, packaging + hardened runtime.
 
 **Pending**:
 - Zen / Firefox rich browser metadata still needs a future companion extension; the current fallback
@@ -311,8 +308,7 @@ Sources/Nukku/
 │                       LaunchAtLoginService, ScreenChangeService, NotificationService
 ├── Utilities/          Constants.swift, Extensions (NSScreen+Notch, Color+Theme)
 ├── ViewModels/         NotchViewModel, MediaViewModel, CalendarViewModel,
-│                       FileDropViewModel, AppLauncherViewModel,
-│                       ShortcutsViewModel, CameraViewModel, HUDViewModel
+│                       FileDropViewModel, CameraViewModel, HUDViewModel
 ├── Views/              NotchContainerView, CollapsedView, ExpandedView,
 │                       NotchShapeView, HUDView
 ├── Widgets/
@@ -322,8 +318,6 @@ Sources/Nukku/
 │   │                   MediaSessionModels, MediaArtworkCache
 │   ├── FileDrop/       FileDropWidget, FileDropWidgetView
 │   ├── Calendar/       CalendarWidget, CalendarWidgetView, EventKitClient
-│   ├── AppLauncher/    AppLauncherWidget, AppLauncherWidgetView
-│   ├── Shortcuts/      ShortcutsWidget, ShortcutsWidgetView
 │   └── Camera/         CameraWidget, CameraWidgetView
 └── Window/             NotchPanel, NotchWindowManager, TrackingHostingView (NotchHostingView)
 ```
@@ -393,7 +387,7 @@ The `activate`/`deactivate` callbacks are called automatically by `NotchViewMode
 
 See the plan file at `.claude/plans/` for the full feature checklist. Short version:
 
-**Done**: fixed-window arch, fused notch silhouette, collapsed media shelves, trusted media-session display, browser/Spotify-aware media detection, AppKit transport hit-testing, HUD (volume + brightness + battery + notifications), preferences, calendar auto-refresh, app launcher / shortcuts / camera widgets, packaging + hardened runtime.
+**Done**: fixed-window arch, fused notch silhouette, collapsed media shelves, trusted media-session display, browser/Spotify-aware media detection, AppKit transport hit-testing, HUD (volume + brightness + battery + notifications), preferences, calendar auto-refresh, camera widget, drag-to-expand file shelf, packaging + hardened runtime.
 
 **Pending**:
 - Zen / Firefox rich browser metadata still needs a future companion extension; the current fallback
