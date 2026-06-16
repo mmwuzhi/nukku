@@ -133,6 +133,16 @@ fi
 echo "==> packaged: $APP"
 
 if [ "$RUN_AFTER" -eq 1 ]; then
+    # Kill any running instance first. `open` only re-activates an existing
+    # process and would NOT load the freshly built binary.
+    if pgrep -f "Nukku.app/Contents/MacOS/Nukku" >/dev/null; then
+        echo "==> stopping running instance"
+        pkill -f "Nukku.app/Contents/MacOS/Nukku" 2>/dev/null || true
+        for _ in 1 2 3 4 5 6 7 8 9 10; do
+            pgrep -f "Nukku.app/Contents/MacOS/Nukku" >/dev/null || break
+            sleep 0.3
+        done
+    fi
     echo "==> launching"
-    open "$APP"
+    open -n "$APP"
 fi
