@@ -179,8 +179,17 @@ enum MediaSessionResolver {
         now: Date = Date(),
         previousSourceStillRunning: Bool
     ) -> MediaSessionSnapshot? {
-        let viable = candidates.compactMap { $0 }.filter {
-            $0.displayKind != .empty && $0.playbackState != .stopped
+        let viable = candidates.compactMap { $0 }.filter { snapshot in
+            guard snapshot.displayKind != .empty, snapshot.playbackState != .stopped else {
+                return false
+            }
+            // A title-less app can remain registered as the OS now-playing client
+            // indefinitely after it pauses. Unlike rich track metadata, that app-only
+            // identity is not useful enough to keep the notch visible forever.
+            if snapshot.confidence == .appOnly, snapshot.playbackState != .playing {
+                return now.timeIntervalSince(snapshot.timestamp) <= pausedSessionTTL
+            }
+            return true
         }
 
         if let best = viable.max(by: { score($0) < score($1) }) {

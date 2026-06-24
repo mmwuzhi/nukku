@@ -173,13 +173,29 @@ static void appForPID(int pid, void (^block)(NSRunningApplication *)) {
 // Centralized function to process track info.
 // It converts, filters, and prints the final JSON data.
 static void processNowPlayingInfo(NSDictionary *nowPlayingInfo, BOOL isPlaying, NSRunningApplication *application) {
-    if (nowPlayingInfo == nil || [nowPlayingInfo count] == 0) {
+    id title = nil;
+    if (nowPlayingInfo != nil && [nowPlayingInfo count] > 0) {
+        title = nowPlayingInfo[(NSString *)kMRMediaRemoteNowPlayingInfoTitle];
+    }
+    BOOL hasTitle = (title != nil && title != [NSNull null] &&
+                     !([title isKindOfClass:[NSString class]] && [(NSString *)title length] == 0));
+
+    // Nukku patch: previously any event without a track title was dropped, and a
+    // nil/empty now-playing info dict printed "NIL". But some media apps (e.g.
+    // FlowVision) register as the now-playing application and publish app-level
+    // playback state (isPlaying) with no track metadata. Dropping those meant
+    // their prompt pause/resume — the very signal Control Center reflects — never
+    // reached the client, which then had to rely on slow CoreAudio output
+    // detection (~10s lag on pause). Emit an app-level event whenever the
+    // now-playing application is identifiable; only fall back to "NIL" when there
+    // is neither a title nor a known application (i.e. nothing is playing).
+    if (!hasTitle && application == nil) {
         printOut(@"NIL");
         return;
     }
-    id title = nowPlayingInfo[(NSString *)kMRMediaRemoteNowPlayingInfoTitle];
-    if (title == nil || title == [NSNull null] || ([title isKindOfClass:[NSString class]] && [(NSString *)title length] == 0)) return;
 
+    // convertNowPlayingInformation is nil-safe and reads whatever fields exist
+    // (rate / elapsed / duration), so a title-less app still carries its progress.
     NSMutableDictionary *data = convertNowPlayingInformation(nowPlayingInfo);
     [data setObject:@(isPlaying) forKey:(NSString *)kIsPlaying];
     if (application) {
@@ -195,11 +211,10 @@ static void processNowPlayingInfo(NSDictionary *nowPlayingInfo, BOOL isPlaying, 
 // and passes it to the processing function.
 static void fetchAndProcess(int pid) {
     MRMediaRemoteGetNowPlayingInfo(_queue, ^(CFDictionaryRef information) {
-        if (information == NULL) {
-            printOut(@"NIL");
-            return;
-        }
-        NSDictionary *infoDict = [(__bridge NSDictionary *)information copy];
+        // Nukku patch: don't bail on a nil info dict — an app may be the
+        // now-playing application (with a known isPlaying state) yet publish no
+        // track metadata. processNowPlayingInfo decides whether to emit or "NIL".
+        NSDictionary *infoDict = (information != NULL) ? [(__bridge NSDictionary *)information copy] : nil;
         MRMediaRemoteGetNowPlayingApplicationIsPlaying(_queue, ^(Boolean isPlaying) {
             void (^processWithPid)(int) = ^(int finalPid) {
                 if (finalPid > 0) {
@@ -528,12 +543,9 @@ void get(void) {
     __block BOOL completed = NO;
 
     MRMediaRemoteGetNowPlayingInfo(_queue, ^(CFDictionaryRef information) {
-        if (information == NULL) {
-            printOut(@"NIL");
-            completed = YES;
-            return;
-        }
-        NSDictionary *infoDict = [(__bridge NSDictionary *)information copy];
+        // Nukku patch: mirror fetchAndProcess — keep going even with a nil info
+        // dict so a title-less now-playing app still reports its playing state.
+        NSDictionary *infoDict = (information != NULL) ? [(__bridge NSDictionary *)information copy] : nil;
         MRMediaRemoteGetNowPlayingApplicationIsPlaying(_queue, ^(Boolean isPlaying) {
             MRMediaRemoteGetNowPlayingApplicationPID(_queue, ^(int fetchedPid) {
                 if (fetchedPid > 0) {

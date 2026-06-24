@@ -6,6 +6,9 @@ struct MediaWidgetView: View {
     @Environment(NotchViewModel.self)  private var notchVM
     @Environment(\.notchNamespace)     private var notchNS
     @State private var prefs = PreferencesManager.shared
+    // View-local @AppStorage so the diagnostics block reacts to changes;
+    // PreferencesManager's property is @ObservationIgnored.
+    @AppStorage("showMediaDiagnostics") private var showMediaDiagnostics = false
 
     private var hasContent: Bool {
         vm.nowPlayingTitle != nil
@@ -67,7 +70,7 @@ struct MediaWidgetView: View {
     }
 
     private var subtitleFont: Font {
-        if prefs.showMediaDiagnostics {
+        if showMediaDiagnostics {
             return .system(size: 9, weight: .medium, design: .monospaced)
         }
         return .system(size: 11, weight: .medium)
@@ -93,6 +96,12 @@ struct MediaWidgetView: View {
     private var artwork: some View {
         if let image = vm.albumArtwork {
             artworkImage(image)
+        } else if let icon = vm.sourceAppIcon {
+            // No track artwork, but we know which app is playing: show its real
+            // icon instead of a generic placeholder so the surface is recognizable.
+            Image(nsImage: icon)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
         } else {
             ZStack {
                 LinearGradient(

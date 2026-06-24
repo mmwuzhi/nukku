@@ -208,6 +208,57 @@ struct MediaSessionResolverTests {
         #expect(resolved?.title == nil)
     }
 
+    @Test("Paused app-only candidate is retained inside TTL")
+    func pausedAppOnlyCandidateRetainedInsideTTL() {
+        let now = Date()
+        let appOnly = snapshot(
+            title: nil,
+            subtitle: nil,
+            appName: "FlowVision",
+            bundleID: "com.example.flowvision",
+            state: .paused,
+            reportedState: .paused,
+            confidence: .appOnly,
+            provider: .mediaRemote,
+            timestamp: now.addingTimeInterval(-30)
+        )
+
+        let resolved = MediaSessionResolver.resolve(
+            candidates: [appOnly],
+            previous: appOnly,
+            now: now,
+            previousSourceStillRunning: true
+        )
+
+        #expect(resolved?.displayKind == .appPlayback)
+        #expect(resolved?.playbackState == .paused)
+    }
+
+    @Test("Paused app-only candidate expires after TTL")
+    func pausedAppOnlyCandidateExpiresAfterTTL() {
+        let now = Date()
+        let appOnly = snapshot(
+            title: nil,
+            subtitle: nil,
+            appName: "FlowVision",
+            bundleID: "com.example.flowvision",
+            state: .paused,
+            reportedState: .paused,
+            confidence: .appOnly,
+            provider: .mediaRemote,
+            timestamp: now.addingTimeInterval(-(MediaSessionResolver.pausedSessionTTL + 1))
+        )
+
+        let resolved = MediaSessionResolver.resolve(
+            candidates: [appOnly],
+            previous: appOnly,
+            now: now,
+            previousSourceStillRunning: true
+        )
+
+        #expect(resolved == nil)
+    }
+
     @Test("Paused session is retained inside TTL")
     func pausedSessionRetainedInsideTTL() {
         let now = Date()

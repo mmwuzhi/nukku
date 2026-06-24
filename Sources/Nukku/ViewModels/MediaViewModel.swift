@@ -14,6 +14,9 @@ final class MediaViewModel {
     var nowPlayingTitle: String?
     var nowPlayingArtist: String?
     var albumArtwork: NSImage?
+    /// Real icon of the app producing audio, used as the artwork fallback when
+    /// no track artwork is published (e.g. the `.appPlayback` case).
+    var sourceAppIcon: NSImage?
     private(set) var displayPlaybackState: PlaybackState = .stopped
     private(set) var validatedPlaybackState: PlaybackState = .stopped
     private(set) var reportedPlaybackState: PlaybackState = .stopped
@@ -323,6 +326,7 @@ final class MediaViewModel {
             nowPlayingTitle = nil
             nowPlayingArtist = nil
             albumArtwork = nil
+            sourceAppIcon = nil
             displayPlaybackState = .stopped
             validatedPlaybackState = .stopped
             reportedPlaybackState = .stopped
@@ -347,6 +351,7 @@ final class MediaViewModel {
         sourceAppName = snapshot.sourceAppName
         sourceBundleID = snapshot.sourceBundleID
         albumArtwork = snapshot.artwork
+        sourceAppIcon = appIcon(forBundleID: snapshot.sourceBundleID)
         duration = snapshot.duration
         elapsedTime = snapshot.elapsedTime
         dataSource = dataSource(for: snapshot.provider)
@@ -363,9 +368,11 @@ final class MediaViewModel {
             nowPlayingTitle = snapshot.title
             nowPlayingArtist = diagnosticsEnabled ? diagnosticsSummary(for: snapshot) : snapshot.subtitle
         case .appPlayback:
-            let appName = snapshot.sourceAppName ?? "App"
-            nowPlayingTitle = appPlaybackTitle(appName: appName, state: displayPlaybackState)
-            nowPlayingArtist = diagnosticsEnabled ? diagnosticsSummary(for: snapshot) : "无法读取媒体标题"
+            // No track metadata is available. Show the app's identity as the
+            // primary line and a neutral hint below; the playback state is
+            // already conveyed by the play/pause glyph, so we don't write it.
+            nowPlayingTitle = snapshot.sourceAppName ?? "App"
+            nowPlayingArtist = diagnosticsEnabled ? diagnosticsSummary(for: snapshot) : "媒体"
         case .empty:
             nowPlayingTitle = nil
             nowPlayingArtist = nil
@@ -374,11 +381,6 @@ final class MediaViewModel {
         let immediateState = MediaPlaybackHeuristics.immediateState(for: snapshot)
         let correctedState = correctedDisplayState(immediate: immediateState, validated: validatedPlaybackState)
         setDisplayPlaybackStateExternal(correctedState)
-
-        if snapshot.displayKind == .appPlayback,
-           let appName = snapshot.sourceAppName {
-            nowPlayingTitle = appPlaybackTitle(appName: appName, state: displayPlaybackState)
-        }
 
         lastPlaybackSample = snapshot.activitySample
 
@@ -473,10 +475,6 @@ final class MediaViewModel {
 
     private func setDisplayPlaybackState(_ value: PlaybackState) {
         displayPlaybackState = value
-        if currentSession?.displayKind == .appPlayback,
-           let appName = sourceAppName {
-            nowPlayingTitle = appPlaybackTitle(appName: appName, state: value)
-        }
         if value == .playing, duration > 0 {
             scheduleProgressTimer()
         } else if value != .playing {
@@ -503,17 +501,13 @@ final class MediaViewModel {
         }
     }
 
-    private func appPlaybackTitle(appName: String, state: PlaybackState) -> String {
-        switch state {
-        case .playing:
-            "\(appName) 正在播放"
-        case .paused:
-            "\(appName) 已暂停"
-        case .stopped:
-            "\(appName) 已停止"
-        case .unknown:
-            "\(appName) 正在播放"
-        }
+    /// Resolves the real app icon for a bundle id, used as the artwork
+    /// fallback so the surface stays recognizable when no track artwork exists.
+    private func appIcon(forBundleID bundleID: String?) -> NSImage? {
+        guard let bundleID,
+              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+        else { return nil }
+        return NSWorkspace.shared.icon(forFile: url.path)
     }
 
     private func diagnosticsSummary(for snapshot: MediaSessionSnapshot) -> String {
