@@ -105,8 +105,21 @@ final class CalendarViewModel {
         let start = cal.date(bySettingHour: 9, minute: 0, second: 0, of: day) ?? day
         event.startDate = start
         event.endDate = cal.date(byAdding: .hour, value: 1, to: start) ?? start
-        event.calendar = client.defaultCalendar() ?? writableCalendars.first
+        event.calendar = preferredDefaultCalendar()
         return event
+    }
+
+    /// Avoid defaulting new events to a UUID-named local calendar: prefer the
+    /// system default when it has a readable name, otherwise the first writable
+    /// calendar with a real name.
+    private func preferredDefaultCalendar() -> EKCalendar? {
+        let writable = writableCalendars
+        if let def = client.defaultCalendar(),
+           def.hasReadableTitle,
+           writable.contains(where: { $0.calendarIdentifier == def.calendarIdentifier }) {
+            return def
+        }
+        return writable.first(where: { $0.hasReadableTitle }) ?? writable.first
     }
 
     @discardableResult

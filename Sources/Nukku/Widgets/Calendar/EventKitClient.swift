@@ -55,7 +55,7 @@ final class EventKitClient {
 
     /// All event calendars known to macOS, including synced accounts (Google, etc.).
     func allCalendars() -> [EKCalendar] {
-        store.calendars(for: .event).sorted { $0.title < $1.title }
+        store.calendars(for: .event).sorted { $0.nukkuDisplayTitle < $1.nukkuDisplayTitle }
     }
 
     /// Calendars that accept new/edited events (excludes read-only subscriptions).
@@ -82,5 +82,34 @@ final class EventKitClient {
     private func visibleCalendars(hiddenCalendarIDs: Set<String>) -> [EKCalendar]? {
         guard !hiddenCalendarIDs.isEmpty else { return nil }
         return allCalendars().filter { !hiddenCalendarIDs.contains($0.calendarIdentifier) }
+    }
+}
+
+extension EKCalendar {
+    /// `true` when the raw title is a usable name. Some local "On My Mac"
+    /// calendars carry a bare UUID as their title; those are not readable.
+    var hasReadableTitle: Bool {
+        let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !t.isEmpty && UUID(uuidString: t) == nil
+    }
+
+    /// Human-readable title for display. Falls back to the account/source name,
+    /// then a generic label, when the raw title is empty or a bare UUID.
+    var nukkuDisplayTitle: String {
+        if hasReadableTitle { return title.trimmingCharacters(in: .whitespacesAndNewlines) }
+        let src = source.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return src.isEmpty ? "本地日历" : src
+    }
+
+    /// The account this calendar belongs to (iCloud / a Google address / 本地 …),
+    /// so the user can tell which calendars come from which connected account.
+    var nukkuSourceLabel: String {
+        let title = source.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        switch source.sourceType {
+        case .local:      return "本地"
+        case .birthdays:  return "通讯录"
+        case .subscribed: return title.isEmpty ? "订阅" : title
+        default:          return title.isEmpty ? "其他" : title
+        }
     }
 }

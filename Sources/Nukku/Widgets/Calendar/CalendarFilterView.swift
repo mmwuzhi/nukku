@@ -35,9 +35,20 @@ struct CalendarFilterView: View {
                 Circle()
                     .fill(Color(cgColor: calendar.cgColor))
                     .frame(width: 8, height: 8)
-                Text(calendar.title)
-                    .font(.system(size: 12))
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(calendar.nukkuDisplayTitle)
+                        .font(.system(size: 12))
+                        .lineLimit(1)
+                    // Account hint, so Google vs iCloud vs local is obvious. Hidden
+                    // when it would just repeat the name (e.g. a UUID-titled iCloud
+                    // calendar already falls back to "iCloud").
+                    if calendar.nukkuSourceLabel != calendar.nukkuDisplayTitle {
+                        Text(calendar.nukkuSourceLabel)
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
                 Spacer(minLength: 0)
             }
             .contentShape(Rectangle())
