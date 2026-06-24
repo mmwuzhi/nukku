@@ -7,13 +7,12 @@ A macOS notch utility that turns the MacBook notch into an interactive panel —
 ## Features
 
 - **Notch panel** — hover (or click) the notch to expand a full widget panel
-- **HUD overlays** — volume and brightness changes show a slim indicator inside the notch, then auto-dismiss
+- **HUD overlays** — volume, brightness, battery, notifications, and lock state appear inside the notch, then auto-dismiss
 - **Widgets**
-  - Now Playing — album art, track title, playback controls via MediaRemote
-  - Clock — live time display
-  - System Monitor — CPU, memory, network throughput
+  - Now Playing — trusted MediaRemote / browser MediaSession metadata and playback controls
   - File Drop — drag files in; open or reveal in Finder
-  - Calendar — today's events via EventKit
+  - Calendar — browse a month, filter calendars, and create, edit, or delete EventKit events
+  - Camera — live preview with Center Stage on supported cameras
 - **Menu bar presence** — fully `.accessory` mode, never appears in the Dock or app switcher
 - **Launch at login** — via `SMAppService`
 - **Multi-screen aware** — repositions to the notch screen on display changes
@@ -30,10 +29,13 @@ A macOS notch utility that turns the MacBook notch into an interactive panel —
 ```bash
 git clone https://github.com/mmwuzhi/nukku
 cd nukku
-swift run
+swift build
+swift test
+./Scripts/package.sh --run
 ```
 
-Or open the directory in Xcode (File → Open… → select the folder) and run the `Nukku` scheme.
+The app must run from the packaged `.app`; the bare executable does not provide the bundle identity
+required by macOS system services. `package.sh` creates and ad-hoc signs `.build/Nukku.app`.
 
 ## Preferences
 
@@ -54,9 +56,11 @@ See [`CLAUDE.md`](CLAUDE.md) for full architecture documentation, directory layo
 
 ## Privacy
 
-- **Calendar access** — requested on first Calendar widget use; only reads today's events
-- **Camera access** — not yet requested (camera widget is planned)
-- **No network requests** — all data is local; no analytics, no telemetry
+- **Calendar access** — requested on first Calendar widget use; used to browse and edit events
+- **Camera access** — requested when the Camera widget is first activated; frames stay on-device
+- **Files** — File Drop reads and writes only files the user explicitly drops into the app
+- **Browser automation** — optional Apple Events access supports browser MediaSession metadata
+- **Network** — no analytics or telemetry; remote MediaSession artwork may be downloaded and cached locally
 
 ## License
 
