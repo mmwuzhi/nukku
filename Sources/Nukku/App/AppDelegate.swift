@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         //    resolves to the right fused-shape dimensions for HUD / tap.
         //  - MediaViewModel needs to fire transport-tap HUD pulses.
         notchVM.hudViewModel = hudVM
+        notchVM.mediaViewModel = mediaVM
         mediaVM.hudViewModel = hudVM
 
         // Start the system now-playing listener (perl-adapter). Done here, not in

@@ -43,6 +43,7 @@ struct NotchContainerView: View {
                 )
                 .animation(shapeSpring, value: vm.state)
                 .animation(shapeSpring, value: vm.activeWidgetID)
+                .animation(shapeSpring, value: mediaVM.hasMediaSession)
                 .animation(NotchAnimator.hudTransition, value: hudVM.currentHUD)
 
             // ── 2. Content layer ──
@@ -80,6 +81,7 @@ struct NotchContainerView: View {
             .animation(contentAnimation, value: presentationMode)
             .animation(shapeSpring, value: vm.state)
             .animation(shapeSpring, value: vm.activeWidgetID)
+            .animation(shapeSpring, value: mediaVM.hasMediaSession)
             // Lock swaps in instantly so no outgoing media/notification view can
             // fade visibly above the secure lock screen; everything else fades.
             .animation(

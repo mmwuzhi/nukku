@@ -55,16 +55,87 @@ struct NotchViewModelTests {
         #expect(vm.isExpanded)
     }
 
+    @Test("suppressAutoCollapse blocks the delayed hover-collapse")
+    @MainActor
+    func suppressBlocksAutoCollapse() async throws {
+        let vm = NotchViewModel()
+        vm.expand()
+        vm.suppressAutoCollapse = true
+        vm.collapse()
+        // Past the collapse delay the panel must still be expanded: a popover/editor
+        // is mid-interaction and must not be torn out from under the cursor.
+        try await Task.sleep(for: .seconds(PreferencesManager.shared.collapseDelay + 0.3))
+        #expect(vm.state == .expanded)
+    }
+
+    @Test("suppression blocks an already scheduled collapse")
+    @MainActor
+    func suppressionBlocksPendingCollapse() async throws {
+        let vm = NotchViewModel()
+        vm.expand()
+        vm.collapse()
+        vm.suppressAutoCollapse = true
+        // Opening a modal during the delay must invalidate the pending collapse.
+        try await Task.sleep(for: .seconds(PreferencesManager.shared.collapseDelay + 0.3))
+        #expect(vm.state == .expanded)
+    }
+
+    @Test("collapse can be re-armed after suppression is lifted")
+    @MainActor
+    func collapseRearmsAfterSuppression() async throws {
+        let vm = NotchViewModel()
+        vm.expand()
+        vm.suppressAutoCollapse = true
+        vm.collapse()
+        #expect(vm.state == .expanded)
+
+        vm.suppressAutoCollapse = false
+        vm.collapse()
+        try await Task.sleep(for: .seconds(PreferencesManager.shared.collapseDelay + 0.3))
+        #expect(vm.state == .collapsed)
+    }
+
+    @Test("forceCollapse() overrides suppression and clears the lock")
+    @MainActor
+    func forceCollapseOverridesSuppression() {
+        let vm = NotchViewModel()
+        vm.expand()
+        vm.suppressAutoCollapse = true
+        vm.forceCollapse()
+        #expect(vm.state == .collapsed)
+        // The lock must always clear on explicit dismissal so it can't get stuck
+        // and leave the notch permanently un-collapsible.
+        #expect(vm.suppressAutoCollapse == false)
+    }
+
+    @Test("expand() starts with auto-collapse unlocked")
+    @MainActor
+    func expandResetsSuppression() {
+        let vm = NotchViewModel()
+        vm.suppressAutoCollapse = true
+        vm.expand()
+        #expect(vm.suppressAutoCollapse == false)
+    }
+
+    @Test("repeated expand preserves suppression for the current session")
+    @MainActor
+    func repeatedExpandPreservesSuppression() {
+        let vm = NotchViewModel()
+        vm.expand()
+        vm.suppressAutoCollapse = true
+        vm.expand()
+        #expect(vm.suppressAutoCollapse == true)
+    }
+
     @Test("targetInteractiveSize reflects fused metrics by state")
     @MainActor
     func targetSizeMatchesState() {
         let vm = NotchViewModel()
-        // Rest metrics: topWidth 300, bodyWidth 286 → bounding width 300.
-        #expect(vm.targetInteractiveSize.width == max(
-            Constants.Geometry.rest.topWidth,
-            Constants.Geometry.rest.bodyWidth
-        ))
-        #expect(vm.targetInteractiveSize.height == Constants.Geometry.rest.height)
+        // Idle (no media attached) collapses to the bare hardware notch: the
+        // resting shoulders carry no content, so the silhouette shrinks to
+        // `collapsedWidth` instead of the wider `Geometry.rest` pill.
+        #expect(vm.targetInteractiveSize.width == vm.collapsedWidth)
+        #expect(vm.targetInteractiveSize.height == vm.collapsedHeight)
         vm.expand()
         // Open metrics: topWidth 318, bodyWidth 300 → bounding width 318.
         #expect(vm.targetInteractiveSize.width == max(

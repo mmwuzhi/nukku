@@ -3,8 +3,14 @@ import EventKit
 
 struct CalendarWidgetView: View {
     @Environment(CalendarViewModel.self) private var vm
+    @Environment(NotchViewModel.self) private var notchVM
     @State private var showFilter = false
     @State private var editing: EditingContext?
+
+    /// True while any panel-spawned popover/editor is open. These render outside
+    /// the notch silhouette, so the panel must not hover-collapse out from under
+    /// them. See `NotchViewModel.suppressAutoCollapse`.
+    private var isModalOpen: Bool { editing != nil || showFilter }
 
     private struct EditingContext: Identifiable {
         let id = UUID()
@@ -34,6 +40,10 @@ struct CalendarWidgetView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onChange(of: isModalOpen) { _, open in
+                notchVM.suppressAutoCollapse = open
+            }
+            .onDisappear { notchVM.suppressAutoCollapse = false }
         }
     }
 

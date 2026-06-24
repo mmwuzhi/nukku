@@ -20,6 +20,15 @@ final class NotchViewModel {
     var state: NotchState = .collapsed
     var activeWidgetID: String? = nil
 
+    /// While true, hover-out must not auto-collapse the panel. Modal-style widget
+    /// surfaces (the calendar event editor, its date/calendar popovers, the
+    /// calendar filter) set this: those popovers are separate windows *outside*
+    /// the notch silhouette, so without this, moving the cursor onto a popover
+    /// option reads as "left the notch" and collapses the panel mid-interaction.
+    /// Only the delayed hover-collapse honors it; explicit dismissals
+    /// (`forceCollapse`) still work.
+    var suppressAutoCollapse: Bool = false
+
     // Set once at launch from screen geometry; never animated
     var collapsedHeight: CGFloat = Constants.Notch.collapsedHeight
     var collapsedWidth:  CGFloat = Constants.Notch.collapsedWidth
@@ -30,6 +39,11 @@ final class NotchViewModel {
     /// dimensions. Weak so neither side owns the other.
     @ObservationIgnored
     weak var hudViewModel: HUDViewModel?
+
+    /// Media view-model is set externally so the resting silhouette can shrink to
+    /// the bare hardware notch when nothing is playing. Weak — no ownership.
+    @ObservationIgnored
+    weak var mediaViewModel: MediaViewModel?
 
     /// Expanded panel height. Media follows Claude Design's compact open model;
     /// other widgets keep enough vertical room for their preferred content.
@@ -63,11 +77,27 @@ final class NotchViewModel {
     /// truth for SwiftUI rendering and AppKit hover/click gating.
     var currentMetrics: Constants.Geometry.StateMetrics {
         switch presentationMode {
-        case .rest: return Constants.Geometry.rest
+        case .rest:
+            // With nothing playing, the shoulders carry no content — collapse the
+            // silhouette to the bare hardware notch so it reads as invisible black
+            // instead of a wider pill bleeding past the cutout.
+            return mediaViewModel?.hasMediaSession == true ? Constants.Geometry.rest : bareNotchMetrics
         case .open: return Constants.Geometry.open(height: targetExpandedHeight)
         case .hud:  return Constants.Geometry.hud
         case .lock, .level: return Constants.Geometry.rest   // same silhouette as rest — no expansion
         }
+    }
+
+    /// Resting silhouette sized to the physical notch — no shoulders. Keeps the
+    /// `rest` melt aesthetic (slight inward bottom curl) but scaled so its top edge
+    /// matches the hardware cutout, making it blend invisibly when idle.
+    private var bareNotchMetrics: Constants.Geometry.StateMetrics {
+        var m = Constants.Geometry.rest
+        let shoulder = m.topWidth - m.bodyWidth
+        m.topWidth  = collapsedWidth
+        m.bodyWidth = collapsedWidth - shoulder
+        m.height    = collapsedHeight
+        return m
     }
 
     // Bounding rect for hitTest in hosting-view coordinates (y-down, origin top-left).
@@ -96,10 +126,15 @@ final class NotchViewModel {
         collapseTask = nil
         hoverEnterTask?.cancel()
         hoverEnterTask = nil
+        // Mouse tracking can request expansion again when the cursor returns from
+        // a popover. Keep that request idempotent: an active modal suppression lock
+        // belongs to the current expanded session and must survive re-entry.
+        guard !isExpanded else { return }
         if activeWidgetID == nil {
             activeWidgetID = WidgetRegistry.shared.enabledWidgets.first?.id
         }
         activateCurrentWidget()
+        suppressAutoCollapse = false
         state = .expanded
         onExpandedChange?(true)
     }
@@ -123,13 +158,18 @@ final class NotchViewModel {
 
     /// Delayed collapse — respects user's collapseDelay preference.
     func collapse() {
+        // A modal-style surface (event editor / open popover) is mid-interaction
+        // outside the silhouette; do not auto-collapse out from under it.
+        guard !suppressAutoCollapse else { return }
         hoverEnterTask?.cancel()
         hoverEnterTask = nil
         collapseTask?.cancel()
         let delay = PreferencesManager.shared.collapseDelay
         collapseTask = Task {
             try? await Task.sleep(for: .seconds(delay))
-            guard !Task.isCancelled else { return }
+            // Suppression may become active after this task was queued (for
+            // example, opening a popover during the collapse delay).
+            guard !Task.isCancelled, !suppressAutoCollapse else { return }
             deactivateCurrentWidget()
             state = .collapsed
             onExpandedChange?(false)
@@ -142,6 +182,8 @@ final class NotchViewModel {
         collapseTask = nil
         hoverEnterTask?.cancel()
         hoverEnterTask = nil
+        // Explicit dismissal always clears the modal lock so it can't get stuck.
+        suppressAutoCollapse = false
         deactivateCurrentWidget()
         state = .collapsed
         onExpandedChange?(false)

@@ -343,9 +343,24 @@ final class NotchWindowManager {
 
     private func handleGlobalMouseDown() {
         let cursor = NSEvent.mouseLocation
-        guard currentTransportControlZoneScreenRect().contains(cursor) else { return }
-        mediaViewModel.togglePlayPause()
-        handleMouseMove()
+        if currentTransportControlZoneScreenRect().contains(cursor) {
+            mediaViewModel.togglePlayPause()
+            handleMouseMove()
+            return
+        }
+        // Click-outside-to-dismiss. In hover mode leaving the region already
+        // collapses; in click mode the panel otherwise stays open until an explicit
+        // tap, so a press anywhere outside the silhouette dismisses it here. The
+        // global monitor only sees events bound for other apps, so clicks inside the
+        // key panel never reach this path.
+        guard PreferencesManager.shared.expandTrigger == .click,
+              let vm = notchViewModel, vm.isExpanded,
+              !currentInteractiveZoneScreenRect().contains(cursor) else { return }
+        // The click is landing on another app, which becomes key on its own. Drop
+        // the saved focus target so the collapse handoff does not yank focus back to
+        // whoever was front before the panel opened.
+        appBeforeKey = nil
+        vm.forceCollapse()
     }
 
     // MARK: - Key-window handoff (cursor authority while expanded)
