@@ -4,6 +4,13 @@ struct PreferencesView: View {
     @State private var prefs = PreferencesManager.shared
     @State private var launchService = LaunchAtLoginService()
     @State private var selectedTab = 0
+    // @AppStorage is the persistence sink (HotkeyService reads the same key via
+    // PreferencesManager). UI gating runs off a @State driver instead: @AppStorage
+    // propagates async through UserDefaults, landing outside any animation
+    // transaction, so the conditional rows wouldn't animate. We mutate the @State
+    // synchronously inside withAnimation, which does animate the row insert/removal.
+    @AppStorage("hotkeyEnabled") private var hotkeyEnabledStore = false
+    @State private var hotkeyEnabled = false
 
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -52,8 +59,14 @@ struct PreferencesView: View {
                 }
             }
             Section("全局快捷键") {
-                Toggle("启用快捷键", isOn: $prefs.hotkeyEnabled)
-                if prefs.hotkeyEnabled {
+                Toggle("启用快捷键", isOn: Binding(
+                    get: { hotkeyEnabled },
+                    set: { newValue in
+                        hotkeyEnabledStore = newValue            // persist for HotkeyService
+                        withAnimation(.snappy) { hotkeyEnabled = newValue }
+                    }
+                ))
+                if hotkeyEnabled {
                     Picker("快捷键", selection: $prefs.hotkeyPreset) {
                         ForEach(HotkeyPreset.allCases) { preset in
                             Text(preset.label).tag(preset)
@@ -72,6 +85,7 @@ struct PreferencesView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .onAppear { hotkeyEnabled = hotkeyEnabledStore }
         .formStyle(.grouped)
         .padding()
     }
