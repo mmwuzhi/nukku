@@ -32,16 +32,19 @@ jobs:
       - name: Test
         run: swift test
 
-      # 仅 main 分支推送时额外做 release build 并上传产物
-      - name: Build release
+      # 仅 main 分支推送时打包可运行的 .app，并保留 bundle 结构上传。
+      - name: Package release app
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: swift build -c release
+        run: |
+          ./Scripts/package.sh
+          codesign --verify --deep --strict .build/Nukku.app
+          ditto -c -k --sequesterRsrc --keepParent .build/Nukku.app .build/Nukku.app.zip
 
       - name: Upload artifact
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: Nukku-${{ github.sha }}
-          path: .build/release/Nukku
+          name: Nukku-ad-hoc-${{ github.sha }}
+          path: .build/Nukku.app.zip
           retention-days: 90
           if-no-files-found: error

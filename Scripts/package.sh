@@ -100,7 +100,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>NSCameraUsageDescription</key>
     <string>Nukku shows a live camera preview in the notch camera widget.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Nukku reads the current tab title from your browser to show what's playing.</string>
+    <string>Nukku reads MediaSession playback metadata from supported browsers to show what is playing.</string>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © 2026 Nukku.</string>
 </dict>

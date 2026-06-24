@@ -18,10 +18,10 @@
     <!-- Camera widget: AVCaptureSession access -->
     <key>com.apple.security.device.camera</key>
     <true/>
-    <!-- Media widget: browser tab title fetch via AppleEvents -->
+    <!-- Media widget: browser MediaSession metadata via AppleEvents -->
     <key>com.apple.security.automation.apple-events</key>
     <true/>
-    <!-- Browser bundle IDs whitelisted for AppleEvents (browser tab title fetch). -->
+    <!-- Sandbox-only browser targets; current non-sandboxed builds rely on per-app TCC consent. -->
     <key>com.apple.security.temporary-exception.apple-events</key>
     <array>
         <string>com.google.Chrome</string>
