@@ -52,6 +52,15 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cp "$BINARY" "$APP/Contents/MacOS/Nukku"
 
+# Bundle SwiftPM resources (localized strings, etc.). SwiftPM emits the target
+# resource bundle next to the executable in the build products directory.
+RESOURCE_BUNDLE=".build/release/Nukku_Nukku.bundle"
+if [ ! -d "$RESOURCE_BUNDLE" ]; then
+    echo "Error: $RESOURCE_BUNDLE not found. Build release first." >&2
+    exit 1
+fi
+cp -R "$RESOURCE_BUNDLE" "$APP/Contents/Resources/"
+
 # Bundle the MediaRemote perl-adapter. The dynamic library goes next to the
 # executable so its @loader_path rpath resolves; run.pl is embedded below.
 ADAPTER_DYLIB=".build/release/libMediaRemoteAdapter.dylib"

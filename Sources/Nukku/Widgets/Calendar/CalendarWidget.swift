@@ -5,7 +5,7 @@ enum CalendarWidget {
     static func box(viewModel: CalendarViewModel) -> AnyNukkuWidgetBox {
         makeWidgetBox(
             id: "calendar",
-            displayName: "日历",
+            displayName: L10n.tr("widget.calendar", "日历"),
             iconName: "calendar",
             accentColor: .red,
             preferredSize: CGSize(width: 280, height: 236),

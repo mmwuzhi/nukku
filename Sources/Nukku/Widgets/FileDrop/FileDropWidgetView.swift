@@ -11,7 +11,7 @@ struct FileDropWidgetView: View {
                     Image(systemName: "arrow.down.doc")
                         .font(.system(size: 26))
                         .foregroundStyle(.secondary)
-                    Text("拖拽文件到此处")
+                    Text(L10n.tr("fileDrop.empty", "拖拽文件到此处"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

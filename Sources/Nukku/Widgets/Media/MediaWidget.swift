@@ -5,7 +5,7 @@ enum MediaWidget {
     static func box(viewModel: MediaViewModel) -> AnyNukkuWidgetBox {
         makeWidgetBox(
             id: "media",
-            displayName: "媒体",
+            displayName: L10n.tr("widget.media", "媒体"),
             iconName: "music.note",
             accentColor: .orange,
             preferredSize: CGSize(width: 280, height: 50),

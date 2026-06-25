@@ -1,0 +1,67 @@
+"widget.media" = "メディア";
+"widget.calendar" = "カレンダー";
+"widget.files" = "ファイル";
+"widget.camera" = "ミラー";
+
+"media.notPlaying" = "再生していません";
+"media.startPlaybackHint" = "ブラウザまたは音楽アプリで再生を開始";
+"media.generic" = "メディア";
+
+"calendar.title.placeholder" = "タイトル";
+"calendar.allDay" = "終日";
+"calendar.start" = "開始";
+"calendar.end" = "終了";
+"calendar.calendar" = "カレンダー";
+"calendar.saveFailed" = "保存できません。このカレンダーは読み取り専用の可能性があります。";
+"calendar.deleteEvent" = "予定を削除";
+"calendar.cancel" = "キャンセル";
+"calendar.save" = "保存";
+"calendar.newEvent" = "新規予定";
+"calendar.editEvent" = "予定を編集";
+"calendar.chooseCalendar" = "カレンダーを選択";
+"calendar.visibleCalendars" = "表示するカレンダー";
+"calendar.showCalendarsHelp" = "表示するカレンダーを選択";
+"calendar.todayHelp" = "今日へ移動";
+"calendar.newEventHelp" = "新規予定";
+"calendar.noEvents" = "予定なし";
+"calendar.permissionRequired" = "カレンダーへのアクセスが必要です";
+"calendar.untitledEvent" = "無題";
+"calendar.localCalendar" = "ローカルカレンダー";
+"calendar.local" = "ローカル";
+"calendar.birthdays" = "誕生日";
+"calendar.subscribed" = "照会";
+"calendar.other" = "その他";
+"calendar.dateFormat" = "M月d日";
+"calendar.dateFormatWithYear" = "yyyy年M月d日";
+"calendar.monthTitleFormat" = "yyyy年M月";
+"calendar.timeFormat" = "HH:mm";
+
+"preferences.general" = "一般";
+"preferences.widgets" = "ウィジェット";
+"preferences.about" = "情報";
+"preferences.launch" = "起動";
+"preferences.launchAtLogin" = "ログイン時に起動";
+"preferences.interaction" = "操作";
+"preferences.expandTrigger" = "展開方法";
+"preferences.expandTrigger.hover" = "ホバー";
+"preferences.expandTrigger.click" = "クリック";
+"preferences.expandDelay" = "展開遅延";
+"preferences.collapseDelay" = "折りたたみ遅延";
+"preferences.globalHotkey" = "グローバルホットキー";
+"preferences.enableHotkey" = "ホットキーを有効にする";
+"preferences.hotkey" = "ホットキー";
+"preferences.accessibilityHint" = "システム設定 > プライバシーとセキュリティ > アクセシビリティでこのアプリを許可してください";
+"preferences.diagnostics" = "診断";
+"preferences.showMediaDiagnostics" = "メディア診断を表示";
+"preferences.mediaDiagnosticsDescription" = "メディアウィジェットにソース、状態、補完情報を表示し、診断ログを出力します";
+"preferences.version" = "バージョン 1.0.0";
+"preferences.settingsAccessibility" = "設定";
+
+"fileDrop.empty" = "ここにファイルをドラッグ";
+"fileDrop.tray" = "ここにドロップして一時保存";
+"fileDrop.revealInFinder" = "Finderに表示";
+"fileDrop.open" = "開く";
+"fileDrop.remove" = "削除";
+
+"camera.permissionDenied" = "カメラへのアクセスが拒否されました";
+"camera.openSystemSettings" = "システム設定で開く";

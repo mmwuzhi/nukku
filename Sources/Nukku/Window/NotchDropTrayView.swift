@@ -15,7 +15,7 @@ struct NotchDropTrayView: View {
             Image(systemName: "tray.and.arrow.down.fill")
                 .font(.system(size: 30, weight: .medium))
                 .foregroundStyle(isTargeted ? Color.nukkuAccent : Color.nukkuSecondaryLabel)
-            Text("拖到这里暂存")
+            Text(L10n.tr("fileDrop.tray", "拖到这里暂存"))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(isTargeted ? Color.nukkuLabel : Color.nukkuSecondaryLabel)
         }

@@ -1,0 +1,67 @@
+"widget.media" = "媒体";
+"widget.calendar" = "日历";
+"widget.files" = "文件";
+"widget.camera" = "镜子";
+
+"media.notPlaying" = "未在播放";
+"media.startPlaybackHint" = "在浏览器或音乐 app 中开始播放";
+"media.generic" = "媒体";
+
+"calendar.title.placeholder" = "标题";
+"calendar.allDay" = "全天";
+"calendar.start" = "开始";
+"calendar.end" = "结束";
+"calendar.calendar" = "日历";
+"calendar.saveFailed" = "保存失败，该日历可能只读";
+"calendar.deleteEvent" = "删除事件";
+"calendar.cancel" = "取消";
+"calendar.save" = "保存";
+"calendar.newEvent" = "新建事件";
+"calendar.editEvent" = "编辑事件";
+"calendar.chooseCalendar" = "选择日历";
+"calendar.visibleCalendars" = "显示的日历";
+"calendar.showCalendarsHelp" = "选择显示的日历";
+"calendar.todayHelp" = "回到今天";
+"calendar.newEventHelp" = "新建事件";
+"calendar.noEvents" = "无日程";
+"calendar.permissionRequired" = "需要日历访问权限";
+"calendar.untitledEvent" = "无标题";
+"calendar.localCalendar" = "本地日历";
+"calendar.local" = "本地";
+"calendar.birthdays" = "通讯录";
+"calendar.subscribed" = "订阅";
+"calendar.other" = "其他";
+"calendar.dateFormat" = "M月d日";
+"calendar.dateFormatWithYear" = "yyyy年M月d日";
+"calendar.monthTitleFormat" = "yyyy年M月";
+"calendar.timeFormat" = "HH:mm";
+
+"preferences.general" = "通用";
+"preferences.widgets" = "Widgets";
+"preferences.about" = "关于";
+"preferences.launch" = "启动";
+"preferences.launchAtLogin" = "登录时自动启动";
+"preferences.interaction" = "交互";
+"preferences.expandTrigger" = "展开方式";
+"preferences.expandTrigger.hover" = "鼠标悬停";
+"preferences.expandTrigger.click" = "点击";
+"preferences.expandDelay" = "展开延迟";
+"preferences.collapseDelay" = "收起延迟";
+"preferences.globalHotkey" = "全局快捷键";
+"preferences.enableHotkey" = "启用快捷键";
+"preferences.hotkey" = "快捷键";
+"preferences.accessibilityHint" = "需要在系统设置 › 隐私与安全性 › 辅助功能中授权此 app";
+"preferences.diagnostics" = "诊断";
+"preferences.showMediaDiagnostics" = "显示媒体诊断";
+"preferences.mediaDiagnosticsDescription" = "在媒体 widget 中显示来源、状态和补全信息，并输出诊断日志";
+"preferences.version" = "版本 1.0.0";
+"preferences.settingsAccessibility" = "偏好设置";
+
+"fileDrop.empty" = "拖拽文件到此处";
+"fileDrop.tray" = "拖到这里暂存";
+"fileDrop.revealInFinder" = "在 Finder 中显示";
+"fileDrop.open" = "打开";
+"fileDrop.remove" = "移除";
+
+"camera.permissionDenied" = "摄像头权限已拒绝";
+"camera.openSystemSettings" = "在系统设置中开启";

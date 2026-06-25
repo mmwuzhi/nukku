@@ -98,7 +98,7 @@ extension EKCalendar {
     var nukkuDisplayTitle: String {
         if hasReadableTitle { return title.trimmingCharacters(in: .whitespacesAndNewlines) }
         let src = source.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        return src.isEmpty ? "本地日历" : src
+        return src.isEmpty ? L10n.tr("calendar.localCalendar", "本地日历") : src
     }
 
     /// The account this calendar belongs to (iCloud / a Google address / 本地 …),
@@ -106,10 +106,10 @@ extension EKCalendar {
     var nukkuSourceLabel: String {
         let title = source.title.trimmingCharacters(in: .whitespacesAndNewlines)
         switch source.sourceType {
-        case .local:      return "本地"
-        case .birthdays:  return "通讯录"
-        case .subscribed: return title.isEmpty ? "订阅" : title
-        default:          return title.isEmpty ? "其他" : title
+        case .local:      return L10n.tr("calendar.local", "本地")
+        case .birthdays:  return L10n.tr("calendar.birthdays", "通讯录")
+        case .subscribed: return title.isEmpty ? L10n.tr("calendar.subscribed", "订阅") : title
+        default:          return title.isEmpty ? L10n.tr("calendar.other", "其他") : title
         }
     }
 }

@@ -5,7 +5,7 @@ enum CameraWidget {
     static func box(viewModel: CameraViewModel) -> AnyNukkuWidgetBox {
         makeWidgetBox(
             id: "camera",
-            displayName: "镜子",
+            displayName: L10n.tr("widget.camera", "镜子"),
             iconName: "camera.fill",
             accentColor: .yellow,
             preferredSize: CGSize(width: 280, height: 170),

@@ -1,0 +1,67 @@
+"widget.media" = "Media";
+"widget.calendar" = "Calendar";
+"widget.files" = "Files";
+"widget.camera" = "Mirror";
+
+"media.notPlaying" = "Not playing";
+"media.startPlaybackHint" = "Start playback in a browser or music app";
+"media.generic" = "Media";
+
+"calendar.title.placeholder" = "Title";
+"calendar.allDay" = "All day";
+"calendar.start" = "Start";
+"calendar.end" = "End";
+"calendar.calendar" = "Calendar";
+"calendar.saveFailed" = "Could not save. This calendar may be read-only.";
+"calendar.deleteEvent" = "Delete Event";
+"calendar.cancel" = "Cancel";
+"calendar.save" = "Save";
+"calendar.newEvent" = "New Event";
+"calendar.editEvent" = "Edit Event";
+"calendar.chooseCalendar" = "Choose Calendar";
+"calendar.visibleCalendars" = "Visible Calendars";
+"calendar.showCalendarsHelp" = "Choose visible calendars";
+"calendar.todayHelp" = "Go to today";
+"calendar.newEventHelp" = "New event";
+"calendar.noEvents" = "No events";
+"calendar.permissionRequired" = "Calendar access required";
+"calendar.untitledEvent" = "Untitled";
+"calendar.localCalendar" = "Local Calendar";
+"calendar.local" = "Local";
+"calendar.birthdays" = "Birthdays";
+"calendar.subscribed" = "Subscribed";
+"calendar.other" = "Other";
+"calendar.dateFormat" = "MMM d";
+"calendar.dateFormatWithYear" = "MMM d, yyyy";
+"calendar.monthTitleFormat" = "MMMM yyyy";
+"calendar.timeFormat" = "HH:mm";
+
+"preferences.general" = "General";
+"preferences.widgets" = "Widgets";
+"preferences.about" = "About";
+"preferences.launch" = "Launch";
+"preferences.launchAtLogin" = "Launch at Login";
+"preferences.interaction" = "Interaction";
+"preferences.expandTrigger" = "Expand Trigger";
+"preferences.expandTrigger.hover" = "Hover";
+"preferences.expandTrigger.click" = "Click";
+"preferences.expandDelay" = "Expand Delay";
+"preferences.collapseDelay" = "Collapse Delay";
+"preferences.globalHotkey" = "Global Hotkey";
+"preferences.enableHotkey" = "Enable Hotkey";
+"preferences.hotkey" = "Hotkey";
+"preferences.accessibilityHint" = "Grant this app access in System Settings > Privacy & Security > Accessibility";
+"preferences.diagnostics" = "Diagnostics";
+"preferences.showMediaDiagnostics" = "Show Media Diagnostics";
+"preferences.mediaDiagnosticsDescription" = "Show source, state, and supplement info in the media widget, and write diagnostic logs";
+"preferences.version" = "Version 1.0.0";
+"preferences.settingsAccessibility" = "Settings";
+
+"fileDrop.empty" = "Drop files here";
+"fileDrop.tray" = "Drop here to hold";
+"fileDrop.revealInFinder" = "Show in Finder";
+"fileDrop.open" = "Open";
+"fileDrop.remove" = "Remove";
+
+"camera.permissionDenied" = "Camera access denied";
+"camera.openSystemSettings" = "Open System Settings";

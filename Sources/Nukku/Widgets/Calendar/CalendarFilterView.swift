@@ -6,7 +6,7 @@ struct CalendarFilterView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("显示的日历")
+            Text(L10n.tr("calendar.visibleCalendars", "显示的日历"))
                 .font(.system(size: 12, weight: .semibold))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)

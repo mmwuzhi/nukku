@@ -122,4 +122,42 @@ struct CalendarGridTests {
         #expect(days.last == gridLast)
         #expect(days.count == 42)
     }
+
+    @Test("Date chip includes year for cross-year events")
+    func dateChipIncludesYearForCrossYearEvents() {
+        let cal = gregorian(firstWeekday: 1)
+        let start = date(2026, 12, 31, cal)
+        let end = date(2027, 1, 1, cal)
+
+        #expect(CalendarDateChipText.includesYear(
+            for: start,
+            pairedWith: end,
+            calendar: cal,
+            now: date(2026, 6, 25, cal)
+        ))
+        #expect(CalendarDateChipText.includesYear(
+            for: end,
+            pairedWith: start,
+            calendar: cal,
+            now: date(2026, 6, 25, cal)
+        ))
+    }
+
+    @Test("Date chip includes year for dates outside current year")
+    func dateChipIncludesYearOutsideCurrentYear() {
+        let cal = gregorian(firstWeekday: 1)
+
+        #expect(CalendarDateChipText.includesYear(
+            for: date(2027, 6, 25, cal),
+            pairedWith: date(2027, 6, 25, cal),
+            calendar: cal,
+            now: date(2026, 6, 25, cal)
+        ))
+        #expect(!CalendarDateChipText.includesYear(
+            for: date(2026, 6, 25, cal),
+            pairedWith: date(2026, 6, 26, cal),
+            calendar: cal,
+            now: date(2026, 6, 25, cal)
+        ))
+    }
 }

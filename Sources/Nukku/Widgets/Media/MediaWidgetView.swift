@@ -18,7 +18,7 @@ struct MediaWidgetView: View {
         if let title = vm.nowPlayingTitle, !title.isEmpty {
             return title
         }
-        return "未在播放"
+        return L10n.tr("media.notPlaying", "未在播放")
     }
 
     private var displaySubtitle: String {
@@ -28,7 +28,7 @@ struct MediaWidgetView: View {
         if let appName = vm.sourceAppName, !appName.isEmpty {
             return appName
         }
-        return "在浏览器或音乐 app 中开始播放"
+        return L10n.tr("media.startPlaybackHint", "在浏览器或音乐 app 中开始播放")
     }
 
     var body: some View {

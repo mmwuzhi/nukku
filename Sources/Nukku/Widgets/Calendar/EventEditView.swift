@@ -42,7 +42,7 @@ struct EventEditView: View {
         VStack(alignment: .leading, spacing: 14) {
             header
 
-            TextField("标题", text: $title)
+            TextField(L10n.tr("calendar.title.placeholder", "标题"), text: $title)
                 .textFieldStyle(.plain)
                 .font(.system(size: 13))
                 .foregroundStyle(.white)
@@ -57,22 +57,30 @@ struct EventEditView: View {
             // One grouped card for all event attributes, so the controls read
             // as a single block instead of three center-floated rows.
             VStack(spacing: 12) {
-                row("全天") {
+                row(L10n.tr("calendar.allDay", "全天")) {
                     Toggle("", isOn: $isAllDay)
                         .labelsHidden()
                         .toggleStyle(.switch)
                         .controlSize(.mini)
                 }
                 rowDivider
-                row("开始") {
-                    DateChip(date: $start, includesTime: !isAllDay)
+                row(L10n.tr("calendar.start", "开始")) {
+                    DateChip(
+                        date: $start,
+                        includesTime: !isAllDay,
+                        includesYear: includesYearInDateChips(for: start)
+                    )
                 }
-                row("结束") {
-                    DateChip(date: $end, includesTime: !isAllDay)
+                row(L10n.tr("calendar.end", "结束")) {
+                    DateChip(
+                        date: $end,
+                        includesTime: !isAllDay,
+                        includesYear: includesYearInDateChips(for: end)
+                    )
                 }
                 if !vm.writableCalendars.isEmpty {
                     rowDivider
-                    row("日历") {
+                    row(L10n.tr("calendar.calendar", "日历")) {
                         calendarSelector
                     }
                 }
@@ -82,7 +90,7 @@ struct EventEditView: View {
             .background(.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
             if saveFailed {
-                Text("保存失败，该日历可能只读")
+                Text(L10n.tr("calendar.saveFailed", "保存失败，该日历可能只读"))
                     .font(.system(size: 10))
                     .foregroundStyle(.red.opacity(0.9))
             }
@@ -91,7 +99,7 @@ struct EventEditView: View {
                 Button(role: .destructive) {
                     if vm.delete(event) { onClose() }
                 } label: {
-                    Text("删除事件")
+                    Text(L10n.tr("calendar.deleteEvent", "删除事件"))
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.red.opacity(0.9))
                         .frame(maxWidth: .infinity)
@@ -108,13 +116,13 @@ struct EventEditView: View {
 
     private var header: some View {
         HStack {
-            Button("取消", action: onClose)
+            Button(L10n.tr("calendar.cancel", "取消"), action: onClose)
                 .buttonStyle(.plain)
                 .font(.system(size: 12))
                 .foregroundStyle(.white.opacity(0.6))
             Spacer()
             Button(action: commit) {
-                Text("保存")
+                Text(L10n.tr("calendar.save", "保存"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(canSave ? .black : .white.opacity(0.3))
                     .padding(.horizontal, 12)
@@ -127,7 +135,7 @@ struct EventEditView: View {
         // Overlay-center the title so it stays dead-center regardless of the
         // differing widths of the cancel link and the save pill.
         .overlay(
-            Text(isNew ? "新建事件" : "编辑事件")
+            Text(isNew ? L10n.tr("calendar.newEvent", "新建事件") : L10n.tr("calendar.editEvent", "编辑事件"))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white)
                 .allowsHitTesting(false)
@@ -167,7 +175,7 @@ struct EventEditView: View {
                         .lineLimit(1)
                         .truncationMode(.tail)
                 } else {
-                    Text("选择日历")
+                    Text(L10n.tr("calendar.chooseCalendar", "选择日历"))
                         .foregroundStyle(.white.opacity(0.5))
                 }
                 Spacer(minLength: 6)
@@ -226,6 +234,15 @@ struct EventEditView: View {
         !title.trimmingCharacters(in: .whitespaces).isEmpty && calendar != nil && end >= start
     }
 
+    private func includesYearInDateChips(for date: Date) -> Bool {
+        CalendarDateChipText.includesYear(
+            for: date,
+            pairedWith: date == start ? end : start,
+            calendar: .current,
+            now: .now
+        )
+    }
+
     private func commit() {
         guard let calendar else { return }
         let cal = Calendar.current
@@ -258,32 +275,72 @@ struct EventEditView: View {
     }
 }
 
+enum CalendarDateChipText {
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = L10n.locale
+        f.dateFormat = L10n.dateFormat("calendar.dateFormat", "M月d日")
+        return f
+    }()
+
+    private static let dateWithYearFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = L10n.locale
+        f.dateFormat = L10n.dateFormat("calendar.dateFormatWithYear", "yyyy年M月d日")
+        return f
+    }()
+
+    static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = L10n.locale
+        f.dateFormat = L10n.dateFormat("calendar.timeFormat", "HH:mm")
+        return f
+    }()
+
+    static func includesYear(
+        for date: Date,
+        pairedWith otherDate: Date,
+        calendar: Calendar,
+        now: Date
+    ) -> Bool {
+        if !calendar.isDate(date, equalTo: now, toGranularity: .year) {
+            return true
+        }
+        return !calendar.isDate(date, equalTo: otherDate, toGranularity: .year)
+    }
+
+    static func dateString(for date: Date, includesYear: Bool) -> String {
+        (includesYear ? dateWithYearFormatter : dateFormatter).string(from: date)
+    }
+
+    static func timeString(for date: Date) -> String {
+        timeFormatter.string(from: date)
+    }
+
+    static func monthTitleString(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = L10n.locale
+        formatter.dateFormat = L10n.dateFormat("calendar.monthTitleFormat", "yyyy年M月")
+        return formatter.string(from: date)
+    }
+}
+
 /// A dark, theme-matching date/time control. Shows a compact pill; tapping opens
 /// a graphical calendar popover. Replaces the raw gray macOS stepper field that
 /// looked dropped-in against the dark form.
 private struct DateChip: View {
     @Binding var date: Date
     let includesTime: Bool
+    let includesYear: Bool
     @State private var open = false
-
-    private static let dateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "M月d日"
-        return f
-    }()
-    private static let timeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm"
-        return f
-    }()
 
     var body: some View {
         Button { open.toggle() } label: {
             HStack(spacing: 8) {
-                Text(Self.dateFormatter.string(from: date))
+                Text(CalendarDateChipText.dateString(for: date, includesYear: includesYear))
                     .foregroundStyle(.white)
                 if includesTime {
-                    Text(Self.timeFormatter.string(from: date))
+                    Text(CalendarDateChipText.timeString(for: date))
                         .foregroundStyle(.white.opacity(0.65))
                         .monospacedDigit()
                 }

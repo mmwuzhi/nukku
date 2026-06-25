@@ -6,7 +6,14 @@ enum ExpandTrigger: String, CaseIterable, Identifiable {
     case hover = "hover"
     case click = "click"
     var id: String { rawValue }
-    var label: String { self == .hover ? "鼠标悬停" : "点击" }
+    var label: String {
+        switch self {
+        case .hover:
+            L10n.tr("preferences.expandTrigger.hover", "鼠标悬停")
+        case .click:
+            L10n.tr("preferences.expandTrigger.click", "点击")
+        }
+    }
 }
 
 enum HotkeyPreset: String, CaseIterable, Identifiable {

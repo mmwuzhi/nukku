@@ -24,7 +24,7 @@ final class CalendarViewModel {
     }
 
     var monthTitle: String {
-        visibleMonth.formatted(.dateTime.year().month(.wide))
+        CalendarDateChipText.monthTitleString(for: visibleMonth)
     }
 
     func hasEvents(on day: Date) -> Bool {

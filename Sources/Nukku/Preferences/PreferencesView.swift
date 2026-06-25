@@ -15,15 +15,15 @@ struct PreferencesView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             generalTab
-                .tabItem { Label("通用", systemImage: "gearshape") }
+                .tabItem { Label(L10n.tr("preferences.general", "通用"), systemImage: "gearshape") }
                 .tag(0)
 
             widgetsTab
-                .tabItem { Label("Widgets", systemImage: "rectangle.3.group") }
+                .tabItem { Label(L10n.tr("preferences.widgets", "Widgets"), systemImage: "rectangle.3.group") }
                 .tag(1)
 
             aboutTab
-                .tabItem { Label("关于", systemImage: "info.circle") }
+                .tabItem { Label(L10n.tr("preferences.about", "关于"), systemImage: "info.circle") }
                 .tag(2)
         }
         .frame(width: 480, height: 340)
@@ -31,35 +31,35 @@ struct PreferencesView: View {
 
     private var generalTab: some View {
         Form {
-            Section("启动") {
-                Toggle("登录时自动启动", isOn: Binding(
+            Section(L10n.tr("preferences.launch", "启动")) {
+                Toggle(L10n.tr("preferences.launchAtLogin", "登录时自动启动"), isOn: Binding(
                     get: { launchService.isEnabled },
                     set: { _ in launchService.toggle() }
                 ))
             }
-            Section("交互") {
-                Picker("展开方式", selection: $prefs.expandTrigger) {
+            Section(L10n.tr("preferences.interaction", "交互")) {
+                Picker(L10n.tr("preferences.expandTrigger", "展开方式"), selection: $prefs.expandTrigger) {
                     ForEach(ExpandTrigger.allCases) { trigger in
                         Text(trigger.label).tag(trigger)
                     }
                 }
                 .pickerStyle(.segmented)
 
-                LabeledContent("展开延迟") {
+                LabeledContent(L10n.tr("preferences.expandDelay", "展开延迟")) {
                     Slider(value: $prefs.expandDelay, in: 0...0.5, step: 0.05)
                     Text(String(format: "%.2fs", prefs.expandDelay))
                         .frame(width: 36)
                         .foregroundStyle(.secondary)
                 }
-                LabeledContent("收起延迟") {
+                LabeledContent(L10n.tr("preferences.collapseDelay", "收起延迟")) {
                     Slider(value: $prefs.collapseDelay, in: 0.1...1.0, step: 0.05)
                     Text(String(format: "%.2fs", prefs.collapseDelay))
                         .frame(width: 36)
                         .foregroundStyle(.secondary)
                 }
             }
-            Section("全局快捷键") {
-                Toggle("启用快捷键", isOn: Binding(
+            Section(L10n.tr("preferences.globalHotkey", "全局快捷键")) {
+                Toggle(L10n.tr("preferences.enableHotkey", "启用快捷键"), isOn: Binding(
                     get: { hotkeyEnabled },
                     set: { newValue in
                         hotkeyEnabledStore = newValue            // persist for HotkeyService
@@ -67,20 +67,20 @@ struct PreferencesView: View {
                     }
                 ))
                 if hotkeyEnabled {
-                    Picker("快捷键", selection: $prefs.hotkeyPreset) {
+                    Picker(L10n.tr("preferences.hotkey", "快捷键"), selection: $prefs.hotkeyPreset) {
                         ForEach(HotkeyPreset.allCases) { preset in
                             Text(preset.label).tag(preset)
                         }
                     }
                     .pickerStyle(.menu)
-                    Text("需要在系统设置 › 隐私与安全性 › 辅助功能中授权此 app")
+                    Text(L10n.tr("preferences.accessibilityHint", "需要在系统设置 › 隐私与安全性 › 辅助功能中授权此 app"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-            Section("诊断") {
-                Toggle("显示媒体诊断", isOn: $prefs.showMediaDiagnostics)
-                Text("在媒体 widget 中显示来源、状态和补全信息，并输出诊断日志")
+            Section(L10n.tr("preferences.diagnostics", "诊断")) {
+                Toggle(L10n.tr("preferences.showMediaDiagnostics", "显示媒体诊断"), isOn: $prefs.showMediaDiagnostics)
+                Text(L10n.tr("preferences.mediaDiagnosticsDescription", "在媒体 widget 中显示来源、状态和补全信息，并输出诊断日志"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -115,7 +115,7 @@ struct PreferencesView: View {
                 .foregroundStyle(.tint)
             Text("Nukku")
                 .font(.largeTitle.bold())
-            Text("版本 1.0.0")
+            Text(L10n.tr("preferences.version", "版本 1.0.0"))
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

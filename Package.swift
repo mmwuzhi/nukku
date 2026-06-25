@@ -4,6 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "Nukku",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v26)
     ],
@@ -27,6 +28,9 @@ let package = Package(
                 .product(name: "SkyLightWindow", package: "SkyLightWindow"),
             ],
             path: "Sources/Nukku",
+            resources: [
+                .process("Resources")
+            ],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ],

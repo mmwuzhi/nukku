@@ -70,7 +70,7 @@ struct CalendarWidgetView: View {
                     .frame(width: 20, height: 20)
             }
             .buttonStyle(.plain)
-            .help("选择显示的日历")
+            .help(L10n.tr("calendar.showCalendarsHelp", "选择显示的日历"))
             .popover(isPresented: $showFilter, arrowEdge: .bottom) {
                 CalendarFilterView().environment(vm)
             }
@@ -82,7 +82,7 @@ struct CalendarWidgetView: View {
                     .frame(width: 20, height: 20)
             }
             .buttonStyle(.plain)
-            .help("回到今天")
+            .help(L10n.tr("calendar.todayHelp", "回到今天"))
             navButton("chevron.right") { vm.goToNextMonth() }
             Button(action: addEvent) {
                 Image(systemName: "plus")
@@ -91,7 +91,7 @@ struct CalendarWidgetView: View {
                     .frame(width: 20, height: 20)
             }
             .buttonStyle(.plain)
-            .help("新建事件")
+            .help(L10n.tr("calendar.newEventHelp", "新建事件"))
         }
     }
 
@@ -110,7 +110,7 @@ struct CalendarWidgetView: View {
     private var dayList: some View {
         Group {
             if vm.selectedDayEvents.isEmpty {
-                Text("无日程")
+                Text(L10n.tr("calendar.noEvents", "无日程"))
                     .font(.system(size: 11))
                     .foregroundStyle(.white.opacity(0.4))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -135,7 +135,7 @@ struct CalendarWidgetView: View {
             Image(systemName: "calendar.badge.exclamationmark")
                 .font(.system(size: 28))
                 .foregroundStyle(.secondary)
-            Text("需要日历访问权限")
+            Text(L10n.tr("calendar.permissionRequired", "需要日历访问权限"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -221,7 +221,7 @@ private struct EventRow: View {
     let event: EKEvent
 
     private var timeString: String {
-        if event.isAllDay { return "全天" }
+        if event.isAllDay { return L10n.tr("calendar.allDay", "全天") }
         return event.startDate.formatted(date: .omitted, time: .shortened)
     }
 
@@ -231,7 +231,7 @@ private struct EventRow: View {
                 .fill(Color(cgColor: event.calendar.cgColor))
                 .frame(width: 3, height: 22)
             VStack(alignment: .leading, spacing: 1) {
-                Text(event.title ?? "无标题")
+                Text(event.title ?? L10n.tr("calendar.untitledEvent", "无标题"))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.white)
                     .lineLimit(1)

@@ -116,6 +116,6 @@ private struct SettingsTile: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("偏好设置")
+        .accessibilityLabel(L10n.tr("preferences.settingsAccessibility", "偏好设置"))
     }
 }

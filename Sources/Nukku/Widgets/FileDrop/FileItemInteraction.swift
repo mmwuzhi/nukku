@@ -86,9 +86,21 @@ final class FileCellNSView: NSView, NSDraggingSource {
 
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = NSMenu()
-        let reveal = NSMenuItem(title: "在 Finder 中显示", action: #selector(handleReveal), keyEquivalent: "")
-        let open = NSMenuItem(title: "打开", action: #selector(handleOpen), keyEquivalent: "")
-        let remove = NSMenuItem(title: "移除", action: #selector(handleRemove), keyEquivalent: "")
+        let reveal = NSMenuItem(
+            title: L10n.tr("fileDrop.revealInFinder", "在 Finder 中显示"),
+            action: #selector(handleReveal),
+            keyEquivalent: ""
+        )
+        let open = NSMenuItem(
+            title: L10n.tr("fileDrop.open", "打开"),
+            action: #selector(handleOpen),
+            keyEquivalent: ""
+        )
+        let remove = NSMenuItem(
+            title: L10n.tr("fileDrop.remove", "移除"),
+            action: #selector(handleRemove),
+            keyEquivalent: ""
+        )
         for item in [reveal, open] { item.target = self; menu.addItem(item) }
         menu.addItem(.separator())
         remove.target = self
