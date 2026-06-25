@@ -89,6 +89,7 @@ final class BrowserMediaSessionProvider {
             debugSourceSummary: "BrowserMediaSession",
             debugClientBundleID: result.bundleID,
             debugRawKeys: rawKeySummary(from: payload),
+            debugPayloadSummary: payloadSummary(from: payload, appName: result.appName, bundleID: result.bundleID),
             usedBrowserSupplement: false
         )
     }
@@ -252,6 +253,30 @@ final class BrowserMediaSessionProvider {
         if payload.duration != nil { keys.append("duration") }
         if payload.playbackRate != nil { keys.append("playbackRate") }
         return keys
+    }
+
+    private func payloadSummary(from payload: ScriptPayload, appName: String, bundleID: String) -> String {
+        [
+            "app=\(appName)",
+            "bundle=\(bundleID)",
+            "title=\(debugPresence(payload.title))",
+            "artist=\(debugPresence(payload.artist))",
+            "album=\(debugPresence(payload.album))",
+            "playbackState=\(payload.playbackState ?? "-")",
+            "hasPlayingMedia=\(payload.hasPlayingMedia)",
+            "hasPausedMedia=\(payload.hasPausedMedia)",
+            "rate=\(payload.playbackRate.map { String(format: "%.2f", $0) } ?? "-")",
+            "elapsed=\(payload.currentTime.map { String(format: "%.2f", $0) } ?? "-")",
+            "duration=\(payload.duration.map { String(format: "%.2f", $0) } ?? "-")",
+            "artworkCount=\(payload.artwork?.count ?? 0)",
+            "host=\(payload.host ?? "-")",
+        ].joined(separator: " ")
+    }
+
+    private func debugPresence(_ value: String?) -> String {
+        guard let value else { return "missing" }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "empty" : "present(\(trimmed.count))"
     }
 
     private func runAppleScript(_ source: String) async -> String? {

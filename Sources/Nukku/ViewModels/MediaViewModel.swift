@@ -27,6 +27,7 @@ final class MediaViewModel {
     var debugSourceSummary: String?
     var debugClientBundleID: String?
     var debugRawKeysSummary: String?
+    var debugPayloadSummary: String?
     var didUseBrowserSupplement: Bool = false
     var debugPlaybackRate: Double?
 
@@ -70,6 +71,12 @@ final class MediaViewModel {
     @ObservationIgnored
     private var lastPlaybackSample: MediaPlaybackSample?
 
+    @ObservationIgnored
+    private var cachedSourceAppIconBundleID: String?
+
+    @ObservationIgnored
+    private var cachedSourceAppIcon: NSImage?
+
     private let burstRefreshInterval: Duration = .milliseconds(140)
     private let burstRefreshCount: Int = 2
     private let optimisticGuardWindow: TimeInterval = 0.4
@@ -102,7 +109,7 @@ final class MediaViewModel {
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.refresh(allowBurstValidation: false)
-                let interval = await self?.currentPollInterval() ?? .seconds(2)
+                let interval = self?.currentPollInterval() ?? .seconds(2)
                 try? await Task.sleep(for: interval)
             }
         }
@@ -224,6 +231,7 @@ final class MediaViewModel {
             debugSourceSummary: "CoreAudio",
             debugClientBundleID: audible.bundleID,
             debugRawKeys: ["bundleID", "isRunning"],
+            debugPayloadSummary: "app=\(audible.appName) bundle=\(audible.bundleID) pid=\(audible.pid)",
             usedBrowserSupplement: false
         )
     }
@@ -268,6 +276,7 @@ final class MediaViewModel {
         mediaRemote.usedBrowserSupplement = true
         mediaRemote.debugSourceSummary = "MediaRemote+BrowserMediaSession"
         mediaRemote.debugRawKeys = Array(Set(mediaRemote.debugRawKeys + browser.debugRawKeys)).sorted()
+        mediaRemote.debugPayloadSummary = "\(mediaRemote.debugPayloadSummary) browser{\(browser.debugPayloadSummary)}"
         return mediaRemote
     }
 
@@ -338,6 +347,7 @@ final class MediaViewModel {
             debugSourceSummary = nil
             debugClientBundleID = nil
             debugRawKeysSummary = nil
+            debugPayloadSummary = nil
             didUseBrowserSupplement = false
             debugPlaybackRate = nil
             lastPlaybackSample = nil
@@ -360,6 +370,7 @@ final class MediaViewModel {
         debugSourceSummary = snapshot.debugSourceSummary
         debugClientBundleID = snapshot.debugClientBundleID
         debugRawKeysSummary = snapshot.debugRawKeys.joined(separator: ",")
+        debugPayloadSummary = snapshot.debugPayloadSummary
         didUseBrowserSupplement = snapshot.usedBrowserSupplement
         debugPlaybackRate = snapshot.playbackRate
 
@@ -372,7 +383,7 @@ final class MediaViewModel {
             // primary line and a neutral hint below; the playback state is
             // already conveyed by the play/pause glyph, so we don't write it.
             nowPlayingTitle = snapshot.sourceAppName ?? "App"
-            nowPlayingArtist = diagnosticsEnabled ? diagnosticsSummary(for: snapshot) : "媒体"
+            nowPlayingArtist = diagnosticsEnabled ? diagnosticsSummary(for: snapshot) : L10n.tr("media.generic", "媒体")
         case .empty:
             nowPlayingTitle = nil
             nowPlayingArtist = nil
@@ -504,10 +515,22 @@ final class MediaViewModel {
     /// Resolves the real app icon for a bundle id, used as the artwork
     /// fallback so the surface stays recognizable when no track artwork exists.
     private func appIcon(forBundleID bundleID: String?) -> NSImage? {
-        guard let bundleID,
-              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
-        else { return nil }
-        return NSWorkspace.shared.icon(forFile: url.path)
+        guard let bundleID else {
+            cachedSourceAppIconBundleID = nil
+            cachedSourceAppIcon = nil
+            return nil
+        }
+        if cachedSourceAppIconBundleID == bundleID {
+            return cachedSourceAppIcon
+        }
+        cachedSourceAppIconBundleID = bundleID
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+            cachedSourceAppIcon = nil
+            return nil
+        }
+        let icon = NSWorkspace.shared.icon(forFile: url.path)
+        cachedSourceAppIcon = icon
+        return icon
     }
 
     private func diagnosticsSummary(for snapshot: MediaSessionSnapshot) -> String {
@@ -534,7 +557,8 @@ final class MediaViewModel {
         reported=\(snapshot.reportedPlaybackState.label) display=\(displayPlaybackState.label) \
         validated=\(validatedPlaybackState.label) rate=\(snapshot.playbackRate.map { String(format: "%.2f", $0) } ?? "-") \
         elapsed=\(String(format: "%.2f", snapshot.elapsedTime)) duration=\(String(format: "%.2f", snapshot.duration)) \
-        supplemented=\(snapshot.usedBrowserSupplement) keys=\(snapshot.debugRawKeys.joined(separator: ","))
+        supplemented=\(snapshot.usedBrowserSupplement) keys=\(snapshot.debugRawKeys.joined(separator: ",")) \
+        payload{\(snapshot.debugPayloadSummary)}
         """
         print(message)
         MediaDiagnosticsLogger.write(message)

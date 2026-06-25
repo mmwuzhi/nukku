@@ -58,6 +58,7 @@ struct MediaSessionSnapshot: Equatable {
     var debugSourceSummary: String
     var debugClientBundleID: String?
     var debugRawKeys: [String]
+    var debugPayloadSummary: String
     var usedBrowserSupplement: Bool
 
     var displayKind: MediaDisplayKind {
@@ -98,6 +99,7 @@ struct MediaSessionSnapshot: Equatable {
             && lhs.debugSourceSummary == rhs.debugSourceSummary
             && lhs.debugClientBundleID == rhs.debugClientBundleID
             && lhs.debugRawKeys == rhs.debugRawKeys
+            && lhs.debugPayloadSummary == rhs.debugPayloadSummary
             && lhs.usedBrowserSupplement == rhs.usedBrowserSupplement
     }
 }

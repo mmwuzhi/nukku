@@ -115,6 +115,7 @@ final class SystemNowPlayingClient {
             debugSourceSummary: "SystemNowPlaying",
             debugClientBundleID: payload.bundleIdentifier,
             debugRawKeys: rawKeys(from: payload),
+            debugPayloadSummary: payloadSummary(from: payload),
             usedBrowserSupplement: false
         )
     }
@@ -130,6 +131,47 @@ final class SystemNowPlayingClient {
         if payload.elapsedTimeMicros != nil { keys.append("elapsed") }
         if payload.playbackRate != nil { keys.append("playbackRate") }
         return keys.sorted()
+    }
+
+    private static func payloadSummary(from payload: TrackInfo.Payload) -> String {
+        [
+            "app=\(debugValue(payload.applicationName))",
+            "bundle=\(debugValue(payload.bundleIdentifier))",
+            "pid=\(payload.PID.map(String.init) ?? "-")",
+            "title=\(debugPresence(payload.title))",
+            "artist=\(debugPresence(payload.artist))",
+            "album=\(debugPresence(payload.album))",
+            "isPlaying=\(payload.isPlaying.map(String.init) ?? "-")",
+            "rate=\(payload.playbackRate.map { String(format: "%.2f", $0) } ?? "-")",
+            "elapsed=\(secondsSummary(micros: payload.elapsedTimeMicros))",
+            "duration=\(secondsSummary(micros: payload.durationMicros))",
+            "timestamp=\(secondsSummary(micros: payload.timestampEpochMicros))",
+            "artworkBytes=\(artworkByteCount(payload.artworkDataBase64).map(String.init) ?? "-")",
+            "artworkMime=\(debugValue(payload.artworkMimeType))",
+            "artworkDecoded=\(payload.artwork == nil ? "false" : "true")",
+        ].joined(separator: " ")
+    }
+
+    private static func debugPresence(_ value: String?) -> String {
+        guard let value else { return "missing" }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "empty" : "present(\(trimmed.count))"
+    }
+
+    private static func debugValue(_ value: String?) -> String {
+        guard let value else { return "-" }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "empty" : trimmed
+    }
+
+    private static func secondsSummary(micros: Double?) -> String {
+        guard let micros else { return "-" }
+        return String(format: "%.2f", micros / 1_000_000)
+    }
+
+    private static func artworkByteCount(_ base64: String?) -> Int? {
+        guard let base64 else { return nil }
+        return Data(base64Encoded: base64)?.count
     }
 
     private static func nonEmpty(_ value: String?) -> String? {

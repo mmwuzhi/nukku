@@ -437,6 +437,7 @@ struct MediaSessionResolverTests {
             debugSourceSummary: String(describing: provider),
             debugClientBundleID: bundleID,
             debugRawKeys: [],
+            debugPayloadSummary: "",
             usedBrowserSupplement: usedBrowserSupplement
         )
     }
