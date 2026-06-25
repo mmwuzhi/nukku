@@ -95,6 +95,20 @@ struct NotchViewModelTests {
         #expect(vm.state == .collapsed)
     }
 
+    @Test("suppression unlock notifies window manager to re-evaluate hover")
+    @MainActor
+    func suppressionUnlockNotifies() {
+        let vm = NotchViewModel()
+        var changes: [Bool] = []
+        vm.onSuppressAutoCollapseChange = { changes.append($0) }
+
+        vm.suppressAutoCollapse = true
+        vm.suppressAutoCollapse = true
+        vm.suppressAutoCollapse = false
+
+        #expect(changes == [true, false])
+    }
+
     @Test("forceCollapse() overrides suppression and clears the lock")
     @MainActor
     func forceCollapseOverridesSuppression() {

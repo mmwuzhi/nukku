@@ -27,7 +27,12 @@ final class NotchViewModel {
     /// option reads as "left the notch" and collapses the panel mid-interaction.
     /// Only the delayed hover-collapse honors it; explicit dismissals
     /// (`forceCollapse`) still work.
-    var suppressAutoCollapse: Bool = false
+    var suppressAutoCollapse: Bool = false {
+        didSet {
+            guard oldValue != suppressAutoCollapse else { return }
+            onSuppressAutoCollapseChange?(suppressAutoCollapse)
+        }
+    }
 
     // Set once at launch from screen geometry; never animated
     var collapsedHeight: CGFloat = Constants.Notch.collapsedHeight
@@ -113,6 +118,12 @@ final class NotchViewModel {
     /// owned by the notch, not the app behind it) and hand focus back on collapse.
     @ObservationIgnored
     var onExpandedChange: ((Bool) -> Void)?
+
+    /// Fired when modal popover/editor suppression changes. The window manager
+    /// uses the false transition to immediately re-check cursor position, so a
+    /// popover closing under an already-outside pointer can collapse right away.
+    @ObservationIgnored
+    var onSuppressAutoCollapseChange: ((Bool) -> Void)?
 
     private var collapseTask: Task<Void, Never>?
     private var hoverEnterTask: Task<Void, Never>?

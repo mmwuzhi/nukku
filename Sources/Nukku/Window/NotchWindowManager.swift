@@ -12,10 +12,12 @@ final class NotchWindowManager {
     private let hotkeyService = HotkeyService()
     private let dropCatcher = NotchDropCatcher()
 
-    // Cursor tracking for hover detection + click-through gating. A global
-    // mouse-move monitor starts a 15 Hz poller only while the pointer is near
-    // the top-center screen band.
+    // Cursor tracking for hover detection + click-through gating. A low-frequency
+    // activation poller wakes a 15 Hz poller only while the pointer is near the
+    // top-center screen band; the global mouse-move monitor remains as an
+    // immediate wake-up path when macOS delivers it.
     private var mouseTimer: Timer?
+    private var mouseActivationTimer: Timer?
     private var mouseMoveMonitor: Any?
     private var mouseDownMonitor: Any?
     private var isCursorInHoverZone: Bool = false
@@ -121,6 +123,10 @@ final class NotchWindowManager {
         notchViewModel?.onExpandedChange = { [weak self] expanded in
             self?.setPanelKey(expanded)
         }
+        notchViewModel?.onSuppressAutoCollapseChange = { [weak self] suppressed in
+            guard !suppressed else { return }
+            self?.handleMouseMove()
+        }
 
         // Start global hotkey (checks enabled flag on each keypress)
         hotkeyService.start { [weak self] in
@@ -157,8 +163,9 @@ final class NotchWindowManager {
     // SwiftUI .onHover uses the view frame (whole 700×340 canvas) and can't be narrowed
     // by .contentShape. NSHostingView's internal tracking covers the whole hosting view.
     // To get a tight hover zone AND let clicks pass through to menu-bar items adjacent
-    // to the notch, the app samples NSEvent.mouseLocation at 15 Hz only while the pointer
-    // is near the top-center screen band.
+    // to the notch, a lightweight 5 Hz activation poller watches for entry into
+    // the top-center screen band. Once active, the app samples NSEvent.mouseLocation
+    // at 15 Hz for precise hover/collapse behavior.
     //
     //  - cursor inside interactiveZone() → panel ignoresMouseEvents = false (panel can be clicked)
     //  - cursor inside expandZone()      → schedule expand
@@ -179,11 +186,14 @@ final class NotchWindowManager {
             guard let self else { return false }
             return self.handlePanelLeftMouseDown(at: point)
         }
+        startMouseActivationPolling()
     }
 
     private func stopMouseMonitor() {
         mouseTimer?.invalidate()
         mouseTimer = nil
+        mouseActivationTimer?.invalidate()
+        mouseActivationTimer = nil
         if let mouseMoveMonitor {
             NSEvent.removeMonitor(mouseMoveMonitor)
             self.mouseMoveMonitor = nil
@@ -193,6 +203,16 @@ final class NotchWindowManager {
             self.mouseDownMonitor = nil
         }
         isMouseTrackingActive = false
+    }
+
+    private func startMouseActivationPolling() {
+        guard mouseActivationTimer == nil else { return }
+        let timer = Timer(timeInterval: 0.20, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.updateMouseTrackingActivation() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        mouseActivationTimer = timer
+        updateMouseTrackingActivation()
     }
 
     private func startTopRegionPollingIfNeeded() {
