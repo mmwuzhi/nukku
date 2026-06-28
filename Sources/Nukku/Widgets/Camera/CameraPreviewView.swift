@@ -22,15 +22,23 @@ struct CameraPreviewView: NSViewRepresentable {
             wantsLayer = true
             let layer = AVCaptureVideoPreviewLayer(session: session)
             layer.videoGravity = .resizeAspectFill
-            // Mirror horizontally so it looks like a real mirror
-            layer.setAffineTransform(CGAffineTransform(scaleX: -1, y: 1))
             self.layer = layer
             previewLayer = layer
+            applyMirror()
         }
 
         override func layout() {
             super.layout()
             previewLayer?.frame = bounds
+            applyMirror()
+        }
+
+        private func applyMirror() {
+            guard let connection = previewLayer?.connection,
+                  connection.isVideoMirroringSupported
+            else { return }
+            connection.automaticallyAdjustsVideoMirroring = false
+            connection.isVideoMirrored = true
         }
     }
 }
