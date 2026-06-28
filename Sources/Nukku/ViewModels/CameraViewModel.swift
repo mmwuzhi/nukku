@@ -13,11 +13,10 @@ final class CameraViewModel {
     private(set) var isRunning = false
     private(set) var isFullScreenPresented = false
 
-    // Tracks independent owners of the shared camera session. The compact widget
-    // can deactivate when the notch auto-collapses, while the full-screen mirror
-    // keeps the same session alive until the user closes that window.
+    // The camera only runs while the Camera widget is the active Nukku tab. The
+    // fullscreen view is just another presentation of that same 720p stream.
     private var wantsWidgetActive = false
-    private var wantsFullScreenActive = false
+    private var isConfigured = false
     private let fullScreenPresenter = CameraFullScreenPresenter()
     nonisolated private let sessionQueue = DispatchQueue(label: "com.nukku.camera.session")
 
@@ -30,11 +29,11 @@ final class CameraViewModel {
         wantsWidgetActive = true
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
-            startSession()
+            startSessionIfNeeded()
         case .notDetermined:
             let granted = await AVCaptureDevice.requestAccess(for: .video)
-            guard wantsCameraActive else { return }   // all owners left during the prompt
-            if granted { startSession() } else { permissionDenied = true }
+            guard wantsWidgetActive else { return }   // deactivated during the prompt
+            if granted { startSessionIfNeeded() } else { permissionDenied = true }
         default:
             permissionDenied = true
         }
@@ -42,109 +41,130 @@ final class CameraViewModel {
 
     func deactivate() {
         wantsWidgetActive = false
-        stopSessionIfIdle()
+        dismissFullScreen()
+        stopSession()
     }
 
     func toggleFullScreen() {
         if isFullScreenPresented {
-            dismissFullScreen(keepWidgetActive: true)
+            dismissFullScreen()
         } else {
             presentFullScreen()
         }
     }
 
-    func dismissFullScreen(keepWidgetActive: Bool = false) {
-        if keepWidgetActive {
-            wantsWidgetActive = true
-        }
-        wantsFullScreenActive = false
+    func dismissFullScreen() {
         isFullScreenPresented = false
-        Task { @MainActor [weak self] in
-            await Task.yield()
-            guard let self else { return }
-            self.fullScreenPresenter.dismiss()
-            self.stopSessionIfIdle()
-        }
+        fullScreenPresenter.dismiss()
     }
 
     // MARK: - Private
 
     private func presentFullScreen() {
-        guard !permissionDenied else { return }
-        wantsFullScreenActive = true
-        startSession()
+        guard !permissionDenied, wantsWidgetActive else { return }
+        startSessionIfNeeded()
         isFullScreenPresented = true
         fullScreenPresenter.present(viewModel: self) { [weak self] in
             self?.handleFullScreenWindowDismissed()
         }
     }
 
-    private func startSession() {
-        guard wantsCameraActive, !isRunning else { return }
-        isRunning = true
-        let s = session
-        sessionQueue.async {
-            // Configure and start on a background thread to avoid blocking @MainActor
-            if s.inputs.isEmpty {
-                s.beginConfiguration()
-                s.sessionPreset = .high
-                if let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
-                                ?? AVCaptureDevice.default(for: .video),
-                   let input = try? AVCaptureDeviceInput(device: device),
-                   s.canAddInput(input) {
-                    s.addInput(input)
-                    Self.enableCenterStageIfSupported(on: device)
-                }
-                s.commitConfiguration()
+    private func startSessionIfNeeded() {
+        guard wantsWidgetActive else { return }
+        if !isConfigured {
+            isConfigured = true
+            let s = session
+            sessionQueue.async {
+                Self.configureSession(s)
             }
+        }
+
+        guard !isRunning else { return }
+        let s = session
+        isRunning = true
+        sessionQueue.async {
             s.startRunning()
         }
     }
 
-    private func stopSessionIfIdle() {
-        guard !wantsCameraActive, isRunning else { return }
+    private func stopSession() {
+        guard isRunning else {
+            isConfigured = false
+            return
+        }
         isRunning = false
+        isConfigured = false
         let s = session
         sessionQueue.async { s.stopRunning() }
     }
 
     private func handleFullScreenWindowDismissed() {
-        wantsFullScreenActive = false
         isFullScreenPresented = false
-        stopSessionIfIdle()
     }
 
-    private var wantsCameraActive: Bool {
-        wantsWidgetActive || wantsFullScreenActive
-    }
-
-    /// Opt into Center Stage (auto-framing) when the camera supports it, the way
-    /// FaceTime does: `.cooperative` lets both the user (Control Center) and the
-    /// app toggle it, and we default it on. No-op on cameras without a
-    /// Center-Stage-capable format (many built-in MacBook cameras), where the
-    /// feed stays normal. Must run inside the session's begin/commitConfiguration.
-    nonisolated private static func enableCenterStageIfSupported(on device: AVCaptureDevice) {
-        guard device.formats.contains(where: { $0.isCenterStageSupported }) else { return }
-        AVCaptureDevice.centerStageControlMode = .cooperative
-        do {
-            try device.lockForConfiguration()
-            // Center Stage can only be enabled on a supporting format; switch to the
-            // highest-resolution supported one if the current format doesn't qualify.
-            if !device.activeFormat.isCenterStageSupported,
-               let best = device.formats
-                   .filter({ $0.isCenterStageSupported })
-                   .max(by: { pixelCount($0) < pixelCount($1) }) {
-                device.activeFormat = best
+    nonisolated private static func configureSession(_ session: AVCaptureSession) {
+        session.beginConfiguration()
+        if let device = cameraDevice(in: session) ?? addCameraInput(to: session) {
+            setPreset(.high, on: session)
+            if !set720pFormatIfAvailable(on: device) {
+                setPreset(.high, on: session)
             }
-            AVCaptureDevice.isCenterStageEnabled = true
-            device.unlockForConfiguration()
-        } catch {
-            // Leave the normal feed if the device can't be locked for configuration.
+        }
+        session.commitConfiguration()
+    }
+
+    nonisolated private static func setPreset(_ preset: AVCaptureSession.Preset, on session: AVCaptureSession) {
+        if session.canSetSessionPreset(preset) {
+            session.sessionPreset = preset
+        } else if session.canSetSessionPreset(.high) {
+            session.sessionPreset = .high
         }
     }
 
-    nonisolated private static func pixelCount(_ format: AVCaptureDevice.Format) -> Int {
-        let d = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-        return Int(d.width) * Int(d.height)
+    nonisolated private static func cameraDevice(in session: AVCaptureSession) -> AVCaptureDevice? {
+        session.inputs
+            .compactMap { ($0 as? AVCaptureDeviceInput)?.device }
+            .first
+    }
+
+    nonisolated private static func addCameraInput(to session: AVCaptureSession) -> AVCaptureDevice? {
+        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .front)
+                ?? AVCaptureDevice.default(for: .video),
+              let input = try? AVCaptureDeviceInput(device: device),
+              session.canAddInput(input)
+        else {
+            return nil
+        }
+        session.addInput(input)
+        return device
+    }
+
+    @discardableResult
+    nonisolated private static func set720pFormatIfAvailable(on device: AVCaptureDevice) -> Bool {
+        let targetWidth: Int32 = 1280
+        let targetHeight: Int32 = 720
+        guard let format = device.formats
+            .map({ (format: $0, dimensions: CMVideoFormatDescriptionGetDimensions($0.formatDescription)) })
+            .filter({ $0.dimensions.width >= targetWidth && $0.dimensions.height >= targetHeight })
+            .min(by: { lhs, rhs in
+                let lhsPixels = Int(lhs.dimensions.width) * Int(lhs.dimensions.height)
+                let rhsPixels = Int(rhs.dimensions.width) * Int(rhs.dimensions.height)
+                if lhsPixels != rhsPixels { return lhsPixels < rhsPixels }
+                let targetAspect = Double(targetWidth) / Double(targetHeight)
+                let lhsAspect = abs(Double(lhs.dimensions.width) / Double(lhs.dimensions.height) - targetAspect)
+                let rhsAspect = abs(Double(rhs.dimensions.width) / Double(rhs.dimensions.height) - targetAspect)
+                return lhsAspect < rhsAspect
+            })?.format
+        else { return false }
+
+        do {
+            try device.lockForConfiguration()
+            device.activeFormat = format
+            device.unlockForConfiguration()
+            return true
+        } catch {
+            // Fall back to the session preset when exact format selection fails.
+            return false
+        }
     }
 }
