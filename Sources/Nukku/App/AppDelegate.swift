@@ -56,8 +56,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Surface a lock/unlock indicator in the notch. On lock, collapse any
         // expanded widget first so calendar/file/camera content is never left
         // above the secure lock screen — only the neutral lock glyph shows.
-        lockService.onLock = { [weak notchVM, weak hudVM] in
+        lockService.onLock = { [weak notchVM, weak hudVM, weak cameraVM] in
             hudVM?.isScreenLocked = true
+            cameraVM?.dismissFullScreen()
             notchVM?.forceCollapse()
             hudVM?.show(.lock(locked: true))
         }

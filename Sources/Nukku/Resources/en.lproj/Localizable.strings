@@ -47,6 +47,9 @@
 "preferences.expandTrigger.click" = "Click";
 "preferences.expandDelay" = "Expand Delay";
 "preferences.collapseDelay" = "Collapse Delay";
+"preferences.hud" = "HUD";
+"preferences.replaceSystemVolumeHUD" = "Replace System Volume HUD";
+"preferences.replaceSystemVolumeHUDDescription" = "When enabled, Nukku intercepts volume keys and shows its own volume HUD. Accessibility access is required";
 "preferences.globalHotkey" = "Global Hotkey";
 "preferences.enableHotkey" = "Enable Hotkey";
 "preferences.hotkey" = "Hotkey";
@@ -65,3 +68,6 @@
 
 "camera.permissionDenied" = "Camera access denied";
 "camera.openSystemSettings" = "Open System Settings";
+"camera.fullScreen" = "Full Screen";
+"camera.exitFullScreen" = "Exit Full Screen";
+"camera.closeFullScreen" = "Exit Full Screen";

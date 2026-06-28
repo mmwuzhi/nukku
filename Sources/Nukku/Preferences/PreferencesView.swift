@@ -58,6 +58,12 @@ struct PreferencesView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            Section(L10n.tr("preferences.hud", "HUD")) {
+                Toggle(L10n.tr("preferences.replaceSystemVolumeHUD", "替换系统音量条"), isOn: $prefs.replaceSystemVolumeHUD)
+                Text(L10n.tr("preferences.replaceSystemVolumeHUDDescription", "开启后 Nukku 会拦截音量键并显示自己的音量 HUD，需要辅助功能权限"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section(L10n.tr("preferences.globalHotkey", "全局快捷键")) {
                 Toggle(L10n.tr("preferences.enableHotkey", "启用快捷键"), isOn: Binding(
                     get: { hotkeyEnabled },

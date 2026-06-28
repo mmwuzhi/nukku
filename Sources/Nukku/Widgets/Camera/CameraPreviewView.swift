@@ -3,11 +3,11 @@ import SwiftUI
 import AppKit
 
 struct CameraPreviewView: NSViewRepresentable {
-    let session: AVCaptureSession
+    let previewLayer: AVCaptureVideoPreviewLayer
 
     func makeNSView(context: Context) -> PreviewNSView {
         let view = PreviewNSView()
-        view.setup(session: session)
+        view.setup(previewLayer: previewLayer)
         return view
     }
 
@@ -18,12 +18,15 @@ struct CameraPreviewView: NSViewRepresentable {
     final class PreviewNSView: NSView {
         private var previewLayer: AVCaptureVideoPreviewLayer?
 
-        func setup(session: AVCaptureSession) {
+        func setup(previewLayer: AVCaptureVideoPreviewLayer) {
             wantsLayer = true
-            let layer = AVCaptureVideoPreviewLayer(session: session)
-            layer.videoGravity = .resizeAspectFill
-            self.layer = layer
-            previewLayer = layer
+            if layer == nil {
+                layer = CALayer()
+            }
+            layer?.backgroundColor = NSColor.black.cgColor
+            previewLayer.removeFromSuperlayer()
+            layer?.addSublayer(previewLayer)
+            self.previewLayer = previewLayer
             applyMirror()
         }
 

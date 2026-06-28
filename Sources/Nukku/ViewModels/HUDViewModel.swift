@@ -115,6 +115,7 @@ final class HUDViewModel {
     var isScreenLocked: Bool = false
 
     private let volumeMonitor     = VolumeMonitor()
+    private let volumeKeyInterceptor = VolumeKeyInterceptor()
     private let brightnessMonitor = BrightnessMonitor()
     private let batteryMonitor    = BatteryMonitor()
     private var dismissTask: Task<Void, Never>?
@@ -135,12 +136,19 @@ final class HUDViewModel {
                 self?.show(.battery(level: level, isCharging: isCharging))
             }
         }
+        volumeKeyInterceptor.onAction = { [weak self] action in
+            Task { @MainActor [weak self] in
+                self?.handleVolumeKey(action)
+            }
+        }
         volumeMonitor.start()
+        volumeKeyInterceptor.start(promptForAccessibility: PreferencesManager.shared.replaceSystemVolumeHUD)
         brightnessMonitor.start()
         batteryMonitor.start()
     }
 
     func stop() {
+        volumeKeyInterceptor.stop()
         volumeMonitor.stop()
         brightnessMonitor.stop()
         batteryMonitor.stop()
@@ -179,6 +187,30 @@ final class HUDViewModel {
             try? await Task.sleep(for: .seconds(duration))
             guard !Task.isCancelled else { return }
             currentHUD = nil
+        }
+    }
+
+    private func handleVolumeKey(_ action: VolumeKeyInterceptor.Action) {
+        let step: Float = 1.0 / 16.0
+
+        switch action {
+        case .volumeUp:
+            if volumeMonitor.readMuted() {
+                volumeMonitor.setMuted(false)
+            }
+            let level = volumeMonitor.setVolume(volumeMonitor.readVolume() + step)
+            show(.volume(level: level, muted: false))
+
+        case .volumeDown:
+            if volumeMonitor.readMuted() {
+                volumeMonitor.setMuted(false)
+            }
+            let level = volumeMonitor.setVolume(volumeMonitor.readVolume() - step)
+            show(.volume(level: level, muted: false))
+
+        case .mute:
+            let muted = volumeMonitor.setMuted(!volumeMonitor.readMuted())
+            show(.volume(level: volumeMonitor.readVolume(), muted: muted))
         }
     }
 }

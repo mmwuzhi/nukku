@@ -47,6 +47,9 @@
 "preferences.expandTrigger.click" = "点击";
 "preferences.expandDelay" = "展开延迟";
 "preferences.collapseDelay" = "收起延迟";
+"preferences.hud" = "HUD";
+"preferences.replaceSystemVolumeHUD" = "替换系统音量条";
+"preferences.replaceSystemVolumeHUDDescription" = "开启后 Nukku 会拦截音量键并显示自己的音量 HUD，需要辅助功能权限";
 "preferences.globalHotkey" = "全局快捷键";
 "preferences.enableHotkey" = "启用快捷键";
 "preferences.hotkey" = "快捷键";
@@ -65,3 +68,6 @@
 
 "camera.permissionDenied" = "摄像头权限已拒绝";
 "camera.openSystemSettings" = "在系统设置中开启";
+"camera.fullScreen" = "全屏显示";
+"camera.exitFullScreen" = "退出全屏";
+"camera.closeFullScreen" = "退出全屏";

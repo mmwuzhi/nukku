@@ -63,6 +63,9 @@ final class PreferencesManager {
     @AppStorage("collapseDelay") var collapseDelay: Double = 0.3
 
     @ObservationIgnored
+    @AppStorage("replaceSystemVolumeHUD") var replaceSystemVolumeHUD: Bool = true
+
+    @ObservationIgnored
     @AppStorage("hotkeyEnabled") private var hotkeyEnabledRaw: Bool = false
     var hotkeyEnabled: Bool {
         get { hotkeyEnabledRaw }

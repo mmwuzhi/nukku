@@ -8,7 +8,8 @@
 #
 # Env vars:
 #   NUKKU_BUNDLE_ID      default: dev.nukku.Nukku
-#   NUKKU_SIGN_IDENTITY  default: -   (ad-hoc; replace with a Developer ID to distribute)
+#   NUKKU_SIGN_IDENTITY  default: first Apple Development identity, else -
+#                        (use a Developer ID identity to distribute)
 #   NUKKU_VERSION        default: 0.1.0
 #
 # Output: .build/Nukku.app
@@ -18,7 +19,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 BUNDLE_ID="${NUKKU_BUNDLE_ID:-dev.nukku.Nukku}"
-SIGN_IDENTITY="${NUKKU_SIGN_IDENTITY:--}"
+DEFAULT_SIGN_IDENTITY="$(/usr/bin/security find-identity -v -p codesigning 2>/dev/null | awk -F\" '/Apple Development:/ { print $2; exit }' || true)"
+SIGN_IDENTITY="${NUKKU_SIGN_IDENTITY:-${DEFAULT_SIGN_IDENTITY:-}}"
+if [ -z "$SIGN_IDENTITY" ]; then
+    SIGN_IDENTITY="-"
+fi
 VERSION="${NUKKU_VERSION:-0.1.0}"
 NO_BUILD=0
 RUN_AFTER=0
@@ -119,7 +124,8 @@ PLIST
 # Sign inside-out: nested code (the adapter dylib + its resource bundle) must be
 # signed before the enclosing app, otherwise the app seal is invalid.
 # For ad-hoc signing ("-"), hardened runtime + timestamp aren't applicable.
-# For a real Developer ID, enable hardened runtime and timestamp for notarization.
+# Apple Development keeps local TCC permissions stable across rebuilds.
+# Developer ID adds timestamping for notarization/distribution.
 DYLIB_IN_APP="$APP/Contents/MacOS/libMediaRemoteAdapter.dylib"
 if [ "$SIGN_IDENTITY" = "-" ]; then
     echo "==> ad-hoc codesign (adapter dylib, then app)"
@@ -128,13 +134,21 @@ if [ "$SIGN_IDENTITY" = "-" ]; then
              --entitlements .entitlements/Nukku.entitlements \
              --sign - \
              "$APP"
-else
-    echo "==> codesign ($SIGN_IDENTITY) + hardened runtime (adapter dylib, then app)"
+elif [[ "$SIGN_IDENTITY" == Developer\ ID\ Application:* ]]; then
+    echo "==> codesign ($SIGN_IDENTITY) + hardened runtime + timestamp (adapter dylib, then app)"
     codesign --force --options runtime --timestamp --sign "$SIGN_IDENTITY" "$DYLIB_IN_APP"
     codesign --force \
              --options runtime \
              --entitlements .entitlements/Nukku.entitlements \
              --timestamp \
+             --sign "$SIGN_IDENTITY" \
+             "$APP"
+else
+    echo "==> codesign ($SIGN_IDENTITY) + hardened runtime (adapter dylib, then app)"
+    codesign --force --options runtime --sign "$SIGN_IDENTITY" "$DYLIB_IN_APP"
+    codesign --force \
+             --options runtime \
+             --entitlements .entitlements/Nukku.entitlements \
              --sign "$SIGN_IDENTITY" \
              "$APP"
 fi

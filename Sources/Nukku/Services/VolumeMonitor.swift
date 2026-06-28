@@ -56,6 +56,34 @@ final class VolumeMonitor: @unchecked Sendable {
         return value != 0
     }
 
+    @discardableResult
+    func setVolume(_ volume: Float) -> Float {
+        guard deviceID != kAudioObjectUnknown else { return 0 }
+        var value = Float32(max(0, min(1, volume)))
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyVolumeScalar,
+            mScope:    kAudioDevicePropertyScopeOutput,
+            mElement:  kAudioObjectPropertyElementMain
+        )
+        let size = UInt32(MemoryLayout<Float32>.size)
+        AudioObjectSetPropertyData(deviceID, &addr, 0, nil, size, &value)
+        return readVolume()
+    }
+
+    @discardableResult
+    func setMuted(_ muted: Bool) -> Bool {
+        guard deviceID != kAudioObjectUnknown else { return false }
+        var value: UInt32 = muted ? 1 : 0
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyMute,
+            mScope:    kAudioDevicePropertyScopeOutput,
+            mElement:  kAudioObjectPropertyElementMain
+        )
+        let size = UInt32(MemoryLayout<UInt32>.size)
+        AudioObjectSetPropertyData(deviceID, &addr, 0, nil, size, &value)
+        return readMuted()
+    }
+
     // MARK: - Private
 
     private func resolveDefaultOutputDevice() -> AudioDeviceID {

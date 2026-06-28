@@ -1,4 +1,4 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import CoreMedia
 import Observation
 
@@ -8,24 +8,32 @@ final class CameraViewModel {
     // nonisolated(unsafe): accessed from background queue for blocking AVFoundation calls.
     // AVCaptureSession is internally thread-safe for configuration/start/stop.
     nonisolated(unsafe) let session = AVCaptureSession()
+    nonisolated(unsafe) let previewLayer = AVCaptureVideoPreviewLayer()
     private(set) var permissionDenied = false
     private(set) var isRunning = false
+    private(set) var isFullScreenPresented = false
 
-    // Tracks whether the widget should be live. Guards the async permission path:
-    // if the widget is deactivated (e.g. the screen locks) while the access prompt
-    // is up, the post-grant start must be skipped so the camera never runs after
-    // deactivation. Serial queue so start/stop can't reorder.
-    private var wantsActive = false
+    // Tracks independent owners of the shared camera session. The compact widget
+    // can deactivate when the notch auto-collapses, while the full-screen mirror
+    // keeps the same session alive until the user closes that window.
+    private var wantsWidgetActive = false
+    private var wantsFullScreenActive = false
+    private let fullScreenPresenter = CameraFullScreenPresenter()
     nonisolated private let sessionQueue = DispatchQueue(label: "com.nukku.camera.session")
 
+    init() {
+        previewLayer.session = session
+        previewLayer.videoGravity = .resizeAspectFill
+    }
+
     func activate() async {
-        wantsActive = true
+        wantsWidgetActive = true
         switch AVCaptureDevice.authorizationStatus(for: .video) {
         case .authorized:
             startSession()
         case .notDetermined:
             let granted = await AVCaptureDevice.requestAccess(for: .video)
-            guard wantsActive else { return }   // deactivated during the prompt
+            guard wantsCameraActive else { return }   // all owners left during the prompt
             if granted { startSession() } else { permissionDenied = true }
         default:
             permissionDenied = true
@@ -33,17 +41,46 @@ final class CameraViewModel {
     }
 
     func deactivate() {
-        wantsActive = false
-        guard isRunning else { return }
-        isRunning = false
-        let s = session
-        sessionQueue.async { s.stopRunning() }
+        wantsWidgetActive = false
+        stopSessionIfIdle()
+    }
+
+    func toggleFullScreen() {
+        if isFullScreenPresented {
+            dismissFullScreen(keepWidgetActive: true)
+        } else {
+            presentFullScreen()
+        }
+    }
+
+    func dismissFullScreen(keepWidgetActive: Bool = false) {
+        if keepWidgetActive {
+            wantsWidgetActive = true
+        }
+        wantsFullScreenActive = false
+        isFullScreenPresented = false
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            guard let self else { return }
+            self.fullScreenPresenter.dismiss()
+            self.stopSessionIfIdle()
+        }
     }
 
     // MARK: - Private
 
+    private func presentFullScreen() {
+        guard !permissionDenied else { return }
+        wantsFullScreenActive = true
+        startSession()
+        isFullScreenPresented = true
+        fullScreenPresenter.present(viewModel: self) { [weak self] in
+            self?.handleFullScreenWindowDismissed()
+        }
+    }
+
     private func startSession() {
-        guard wantsActive, !isRunning else { return }
+        guard wantsCameraActive, !isRunning else { return }
         isRunning = true
         let s = session
         sessionQueue.async {
@@ -62,6 +99,23 @@ final class CameraViewModel {
             }
             s.startRunning()
         }
+    }
+
+    private func stopSessionIfIdle() {
+        guard !wantsCameraActive, isRunning else { return }
+        isRunning = false
+        let s = session
+        sessionQueue.async { s.stopRunning() }
+    }
+
+    private func handleFullScreenWindowDismissed() {
+        wantsFullScreenActive = false
+        isFullScreenPresented = false
+        stopSessionIfIdle()
+    }
+
+    private var wantsCameraActive: Bool {
+        wantsWidgetActive || wantsFullScreenActive
     }
 
     /// Opt into Center Stage (auto-framing) when the camera supports it, the way

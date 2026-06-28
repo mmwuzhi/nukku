@@ -47,6 +47,9 @@
 "preferences.expandTrigger.click" = "クリック";
 "preferences.expandDelay" = "展開遅延";
 "preferences.collapseDelay" = "折りたたみ遅延";
+"preferences.hud" = "HUD";
+"preferences.replaceSystemVolumeHUD" = "システム音量HUDを置き換える";
+"preferences.replaceSystemVolumeHUDDescription" = "有効にすると、Nukku が音量キーを横取りして独自の音量HUDを表示します。アクセシビリティ権限が必要です";
 "preferences.globalHotkey" = "グローバルホットキー";
 "preferences.enableHotkey" = "ホットキーを有効にする";
 "preferences.hotkey" = "ホットキー";
@@ -65,3 +68,6 @@
 
 "camera.permissionDenied" = "カメラへのアクセスが拒否されました";
 "camera.openSystemSettings" = "システム設定で開く";
+"camera.fullScreen" = "フルスクリーン表示";
+"camera.exitFullScreen" = "フルスクリーンを終了";
+"camera.closeFullScreen" = "フルスクリーンを終了";

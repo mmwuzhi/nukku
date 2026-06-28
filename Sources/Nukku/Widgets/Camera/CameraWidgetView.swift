@@ -13,9 +13,39 @@ struct CameraWidgetView: View {
     }
 
     private var cameraPreview: some View {
-        CameraPreviewView(session: vm.session)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ZStack(alignment: .topTrailing) {
+            if vm.isFullScreenPresented {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.black)
+                    .overlay {
+                        Image(systemName: "rectangle.inset.filled.and.person.filled")
+                            .font(.system(size: 30, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.42))
+                    }
+            } else {
+                CameraPreviewView(previewLayer: vm.previewLayer)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            }
+
+            Button {
+                vm.toggleFullScreen()
+            } label: {
+                Image(systemName: vm.isFullScreenPresented ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(.black.opacity(0.46), in: Circle())
+                    .overlay {
+                        Circle().stroke(.white.opacity(0.20), lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
+            .help(vm.isFullScreenPresented
+                  ? L10n.tr("camera.exitFullScreen", "退出全屏")
+                  : L10n.tr("camera.fullScreen", "全屏显示"))
+            .padding(8)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var permissionDeniedView: some View {
