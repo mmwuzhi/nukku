@@ -38,22 +38,38 @@ struct NotchDropTrayView: View {
         .onChange(of: isTargeted) { _, targeted in onTargetedChange(targeted) }
         .onDrop(of: ["public.file-url"], isTargeted: $isTargeted) { providers in
             let group = DispatchGroup()
-            var urls: [URL] = []
+            let collector = DropURLCollector()
             for provider in providers {
                 group.enter()
                 provider.loadItem(forTypeIdentifier: "public.file-url") { item, _ in
                     if let data = item as? Data,
                        let url = URL(dataRepresentation: data, relativeTo: nil) {
-                        urls.append(url)
+                        collector.append(url)
                     }
                     group.leave()
                 }
             }
             group.notify(queue: .main) {
+                let urls = collector.urls
                 guard !urls.isEmpty else { return }
                 onDrop(urls)
             }
             return true
+        }
+    }
+}
+
+private final class DropURLCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [URL] = []
+
+    var urls: [URL] {
+        lock.withLock { storage }
+    }
+
+    func append(_ url: URL) {
+        lock.withLock {
+            storage.append(url)
         }
     }
 }
