@@ -33,7 +33,20 @@ final class LockStateService {
     /// Interval for the while-locked reconciliation poll. Runs only while locked
     /// (screen off, user away), so a modest cadence is free; it just needs to clear
     /// the glyph promptly after the user returns when an unlock edge was missed.
-    private static let reconcileInterval: Duration = .seconds(2)
+    private let reconcileInterval: Duration
+
+    /// Authoritative live lock-state read. Injectable so the reconciliation logic
+    /// can be exercised deterministically in tests without the real window-server
+    /// session dictionary or distributed notifications.
+    private let lockStateReader: @MainActor () -> Bool
+
+    init(
+        reconcileInterval: Duration = .seconds(2),
+        lockStateReader: @escaping @MainActor () -> Bool = { LockStateService.isSessionLocked() }
+    ) {
+        self.reconcileInterval = reconcileInterval
+        self.lockStateReader = lockStateReader
+    }
 
     func start() {
         let center = DistributedNotificationCenter.default()
@@ -66,7 +79,7 @@ final class LockStateService {
         // *behind* the lock screen should surface the indicator. After seeding, the
         // (unauthenticated) distributed notifications are mere triggers to re-read
         // the authoritative state rather than trusted transitions.
-        let locked = Self.isSessionLocked()
+        let locked = lockStateReader()
         lastKnownLocked = locked
         if locked {
             startLockedReconcile()
@@ -74,8 +87,8 @@ final class LockStateService {
         }
     }
 
-    private func syncLockState() {
-        let locked = Self.isSessionLocked()
+    func syncLockState() {
+        let locked = lockStateReader()
         if locked {
             // Lock must take effect immediately — never debounced — so no widget /
             // media content is ever left visible above the secure lock screen. A
@@ -93,11 +106,11 @@ final class LockStateService {
             unlockDebounce?.cancel()
             unlockDebounce = Task { [weak self] in
                 try? await Task.sleep(for: Self.unlockSettle)
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled, let self else { return }
                 // Re-read at settle time — the live session dictionary is the
                 // authority; a flap that ended back at "locked" must not unlock.
-                guard Self.isSessionLocked() == false else { return }
-                self?.commit(locked: false)
+                guard self.lockStateReader() == false else { return }
+                self.commit(locked: false)
             }
         }
     }
@@ -120,11 +133,12 @@ final class LockStateService {
     /// `screenIsUnlocked` edge was never delivered (dropped across a long suspension).
     private func startLockedReconcile() {
         lockedReconcile?.cancel()
+        let interval = reconcileInterval
         lockedReconcile = Task { [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: Self.reconcileInterval)
+                try? await Task.sleep(for: interval)
                 guard !Task.isCancelled, let self else { return }
-                guard Self.isSessionLocked() == false else { continue }
+                guard self.lockStateReader() == false else { continue }
                 self.commit(locked: false)
                 return
             }
