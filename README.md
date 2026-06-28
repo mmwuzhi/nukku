@@ -35,7 +35,9 @@ swift test
 ```
 
 The app must run from the packaged `.app`; the bare executable does not provide the bundle identity
-required by macOS system services. `package.sh` creates and ad-hoc signs `.build/Nukku.app`.
+required by macOS system services. `package.sh` creates and signs `.build/Nukku.app`; add
+`--install-user` to copy it to `~/Applications/Nukku.app`, or combine it with `--run` to launch the
+installed copy.
 
 ## Preferences
 

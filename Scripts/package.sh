@@ -5,6 +5,7 @@
 #   ./Scripts/package.sh                # builds release + packages + codesigns
 #   ./Scripts/package.sh --no-build     # skip swift build, use existing binary
 #   ./Scripts/package.sh --run          # package then launch the app
+#   ./Scripts/package.sh --install-user # copy packaged app to ~/Applications/Nukku.app
 #
 # Env vars:
 #   NUKKU_BUNDLE_ID      default: dev.nukku.Nukku
@@ -13,6 +14,7 @@
 #   NUKKU_VERSION        default: 0.1.0
 #
 # Output: .build/Nukku.app
+# With --install-user: ~/Applications/Nukku.app
 
 set -euo pipefail
 
@@ -27,13 +29,15 @@ fi
 VERSION="${NUKKU_VERSION:-0.1.0}"
 NO_BUILD=0
 RUN_AFTER=0
+INSTALL_USER=0
 
 for arg in "$@"; do
     case "$arg" in
-        --no-build) NO_BUILD=1 ;;
-        --run)      RUN_AFTER=1 ;;
+        --no-build)     NO_BUILD=1 ;;
+        --run)          RUN_AFTER=1 ;;
+        --install-user) INSTALL_USER=1 ;;
         -h|--help)
-            sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         *) echo "Unknown arg: $arg" >&2; exit 1 ;;
@@ -84,6 +88,13 @@ if [ ! -f "$ADAPTER_RUNPL" ]; then
 fi
 cp "$ADAPTER_RUNPL" "$APP/Contents/Resources/run.pl"
 
+APP_ICON="Sources/Nukku/Resources/AppIcon.icns"
+if [ ! -f "$APP_ICON" ]; then
+    echo "Error: $APP_ICON not found." >&2
+    exit 1
+fi
+cp "$APP_ICON" "$APP/Contents/Resources/AppIcon.icns"
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -97,6 +108,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <string>Nukku</string>
     <key>CFBundleDisplayName</key>
     <string>Nukku</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -155,6 +168,22 @@ fi
 
 echo "==> packaged: $APP"
 
+RUN_APP="$APP"
+if [ "$INSTALL_USER" -eq 1 ]; then
+    if [ -z "${HOME:-}" ]; then
+        echo "Error: HOME is not set; cannot install to ~/Applications." >&2
+        exit 1
+    fi
+    USER_APPS="$HOME/Applications"
+    INSTALL_APP="$USER_APPS/Nukku.app"
+    echo "==> installing: $INSTALL_APP"
+    mkdir -p "$USER_APPS"
+    rm -rf "$INSTALL_APP"
+    /usr/bin/ditto "$APP" "$INSTALL_APP"
+    RUN_APP="$INSTALL_APP"
+    echo "==> installed: $INSTALL_APP"
+fi
+
 if [ "$RUN_AFTER" -eq 1 ]; then
     # Kill any running instance first. `open` only re-activates an existing
     # process and would NOT load the freshly built binary.
@@ -167,5 +196,5 @@ if [ "$RUN_AFTER" -eq 1 ]; then
         done
     fi
     echo "==> launching"
-    open -n "$APP"
+    open -n "$RUN_APP"
 fi
