@@ -65,6 +65,27 @@ ad-hoc codesigns it with the entitlements in `.entitlements/Nukku.entitlements`.
 
 No Xcode project file — pure Swift Package Manager. Target: macOS 26+, Swift 6 strict concurrency.
 
+## Version & Release
+
+Current public version: `0.1.0`, stored in the root `VERSION` file. `Scripts/package.sh` reads that
+file by default and writes it to `CFBundleShortVersionString`; `CFBundleVersion` defaults to
+`GITHUB_RUN_NUMBER` in CI and `1` locally unless `NUKKU_BUILD_NUMBER` is set.
+
+GitHub Actions:
+
+- `.github/workflows/ci.yml` builds and tests every branch and pull request, then uploads an ad-hoc
+  signed `Nukku.app.zip` artifact for pushes to `main`.
+- `.github/workflows/release.yml` runs on tags like `v0.1.0`, checks that the tag matches `VERSION`,
+  runs tests, packages `Nukku.app.zip`, writes a SHA-256 checksum, and creates the GitHub Release
+  from `CHANGELOG.md`.
+
+To publish `0.1.0`:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
 ## Architecture
 
 ### Fixed-Canvas Window (critical — do not revert)
