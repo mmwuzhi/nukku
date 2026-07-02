@@ -57,7 +57,7 @@
 "preferences.diagnostics" = "Diagnostics";
 "preferences.showMediaDiagnostics" = "Show Media Diagnostics";
 "preferences.mediaDiagnosticsDescription" = "Show source, state, and supplement info in the media widget, and write diagnostic logs";
-"preferences.version" = "Version 1.0.0";
+"preferences.version" = "Version %@";
 "preferences.settingsAccessibility" = "Settings";
 
 "fileDrop.empty" = "Drop files here";

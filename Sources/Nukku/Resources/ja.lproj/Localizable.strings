@@ -57,7 +57,7 @@
 "preferences.diagnostics" = "診断";
 "preferences.showMediaDiagnostics" = "メディア診断を表示";
 "preferences.mediaDiagnosticsDescription" = "メディアウィジェットにソース、状態、補完情報を表示し、診断ログを出力します";
-"preferences.version" = "バージョン 1.0.0";
+"preferences.version" = "バージョン %@";
 "preferences.settingsAccessibility" = "設定";
 
 "fileDrop.empty" = "ここにファイルをドラッグ";

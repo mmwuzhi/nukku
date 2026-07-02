@@ -121,9 +121,14 @@ struct PreferencesView: View {
                 .foregroundStyle(.tint)
             Text("Nukku")
                 .font(.largeTitle.bold())
-            Text(L10n.tr("preferences.version", "版本 1.0.0"))
+            Text(appVersionText)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var appVersionText: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.0"
+        return String(format: L10n.tr("preferences.version", "Version %@"), version)
     }
 }

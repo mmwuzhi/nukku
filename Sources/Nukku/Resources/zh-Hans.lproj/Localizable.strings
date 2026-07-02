@@ -57,7 +57,7 @@
 "preferences.diagnostics" = "诊断";
 "preferences.showMediaDiagnostics" = "显示媒体诊断";
 "preferences.mediaDiagnosticsDescription" = "在媒体 widget 中显示来源、状态和补全信息，并输出诊断日志";
-"preferences.version" = "版本 1.0.0";
+"preferences.version" = "版本 %@";
 "preferences.settingsAccessibility" = "偏好设置";
 
 "fileDrop.empty" = "拖拽文件到此处";
