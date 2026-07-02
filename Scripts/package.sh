@@ -11,7 +11,8 @@
 #   NUKKU_BUNDLE_ID      default: dev.nukku.Nukku
 #   NUKKU_SIGN_IDENTITY  default: first Apple Development identity, else -
 #                        (use a Developer ID identity to distribute)
-#   NUKKU_VERSION        default: 0.1.0
+#   NUKKU_VERSION        default: VERSION file, else 0.1.0
+#   NUKKU_BUILD_NUMBER   default: GITHUB_RUN_NUMBER, else 1
 #
 # Output: .build/Nukku.app
 # With --install-user: ~/Applications/Nukku.app
@@ -26,7 +27,13 @@ SIGN_IDENTITY="${NUKKU_SIGN_IDENTITY:-${DEFAULT_SIGN_IDENTITY:-}}"
 if [ -z "$SIGN_IDENTITY" ]; then
     SIGN_IDENTITY="-"
 fi
-VERSION="${NUKKU_VERSION:-0.1.0}"
+VERSION_FILE="VERSION"
+DEFAULT_VERSION="0.1.0"
+if [ -f "$VERSION_FILE" ]; then
+    DEFAULT_VERSION="$(tr -d '[:space:]' < "$VERSION_FILE")"
+fi
+VERSION="${NUKKU_VERSION:-$DEFAULT_VERSION}"
+BUILD_NUMBER="${NUKKU_BUILD_NUMBER:-${GITHUB_RUN_NUMBER:-1}}"
 NO_BUILD=0
 RUN_AFTER=0
 INSTALL_USER=0
@@ -115,7 +122,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleShortVersionString</key>
     <string>${VERSION}</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>${BUILD_NUMBER}</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>LSMinimumSystemVersion</key>
